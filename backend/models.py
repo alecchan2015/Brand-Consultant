@@ -73,6 +73,18 @@ class TaskResult(Base):
     task = relationship("Task", back_populates="results")
 
 
+class SystemSetting(Base):
+    """
+    Simple key/value store for runtime configuration (PPT provider selection,
+    external API keys, endpoints). Values are JSON-encoded in the `value` column.
+    """
+    __tablename__ = "system_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, index=True, nullable=False)
+    value = Column(Text, nullable=True)          # JSON-encoded
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
     id = Column(Integer, primary_key=True, index=True)

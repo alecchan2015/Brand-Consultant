@@ -7,8 +7,8 @@
 
     <el-alert title="配置说明" type="info" show-icon :closable="false" style="margin-bottom:16px">
       <template #default>
-        为每个 Agent 专家分别配置大模型。选择"全部专家"表示作为默认兜底配置。<br>
-        支持：OpenAI (GPT-4等) / Anthropic (Claude) / 火山引擎 (豆包等 OpenAI-兼容接口)
+        为每个 Agent 专家分别配置大模型；选择"图像生成"可接入 AI 绘图 API，用于自动生成品牌 Logo。<br>
+        支持：OpenAI (GPT / DALL-E) / Anthropic (Claude) / 火山引擎 (豆包文本 &amp; 视觉) / Stability AI
       </template>
     </el-alert>
 
@@ -53,9 +53,10 @@
         </el-form-item>
         <el-form-item label="供应商">
           <el-select v-model="form.provider" style="width:100%" @change="onProviderChange">
-            <el-option label="OpenAI (GPT系列)" value="openai" />
+            <el-option label="OpenAI (GPT / DALL-E)" value="openai" />
             <el-option label="Anthropic (Claude系列)" value="anthropic" />
-            <el-option label="火山引擎 (豆包/Doubao)" value="volcano" />
+            <el-option label="火山引擎 (豆包文本 & 视觉)" value="volcano" />
+            <el-option label="Stability AI (图像生成)" value="stability" />
           </el-select>
         </el-form-item>
         <el-form-item label="模型名称">
@@ -70,13 +71,17 @@
           <el-input v-model="form.base_url" :placeholder="baseUrlPlaceholder[form.provider]" />
           <div class="hint">可选，火山引擎必填</div>
         </el-form-item>
-        <el-form-item label="适用专家">
+        <el-form-item label="用途">
           <el-select v-model="form.agent_type" style="width:100%">
-            <el-option label="全部专家（默认）" value="all" />
+            <el-option label="全部专家（默认兜底）" value="all" />
             <el-option label="战略规划专家" value="strategy" />
             <el-option label="品牌设计专家" value="brand" />
             <el-option label="运营实施专家" value="operations" />
+            <el-option label="🎨 图像生成（Logo AI绘图）" value="image_gen" />
           </el-select>
+          <div v-if="form.agent_type === 'image_gen'" class="hint" style="color:#e6a23c">
+            启用后，品牌设计任务将自动调用此 API 生成 Logo 图片，嵌入 PNG / PSD 文件中。
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -101,27 +106,35 @@ const saving = ref(false)
 
 const form = ref({ name: '', provider: 'openai', api_key: '', model_name: '', base_url: '', agent_type: 'all' })
 
-const providerLabel = { openai: 'OpenAI', anthropic: 'Anthropic', volcano: '火山引擎' }
-const providerType = { openai: 'primary', anthropic: 'success', volcano: 'warning' }
-const agentLabel = { all: '全部', strategy: '战略规划', brand: '品牌设计', operations: '运营实施' }
-const agentTagType = { all: 'info', strategy: 'primary', brand: 'success', operations: 'warning' }
+const providerLabel = { openai: 'OpenAI', anthropic: 'Anthropic', volcano: '火山引擎', stability: 'Stability AI' }
+const providerType = { openai: 'primary', anthropic: 'success', volcano: 'warning', stability: 'danger' }
+const agentLabel = { all: '全部', strategy: '战略规划', brand: '品牌设计', operations: '运营实施', image_gen: '图像生成' }
+const agentTagType = { all: 'info', strategy: 'primary', brand: 'success', operations: 'warning', image_gen: 'danger' }
 
 const modelOptions = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'dall-e-3', 'dall-e-2'],
   anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
-  volcano: ['doubao-pro-32k', 'doubao-lite-32k', 'doubao-pro-4k'],
+  volcano: [
+    'doubao-pro-32k', 'doubao-lite-32k', 'doubao-pro-4k',
+    'doubao-seedream-3-0-t2i-250415', 'doubao-vision-pro-32k',
+  ],
+  stability: ['stable-diffusion-xl-1024-v1-0', 'stable-diffusion-v1-6'],
 }
 
 const baseUrlPlaceholder = {
   openai: '留空使用默认 https://api.openai.com/v1',
   anthropic: '留空使用默认 Anthropic API',
-  volcano: 'https://ark.volcengineapi.com/api/v3',
+  volcano: 'https://ark.volces.com/api/v3',
+  stability: '留空使用默认 https://api.stability.ai',
 }
 
 function onProviderChange() {
   form.value.model_name = ''
   if (form.value.provider === 'volcano') {
-    form.value.base_url = 'https://ark.volcengineapi.com/api/v3'
+    form.value.base_url = 'https://ark.volces.com/api/v3'
+  } else if (form.value.provider === 'stability') {
+    form.value.base_url = ''
+    if (form.value.agent_type !== 'image_gen') form.value.agent_type = 'image_gen'
   } else {
     form.value.base_url = ''
   }

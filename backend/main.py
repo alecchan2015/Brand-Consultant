@@ -27,7 +27,11 @@ from schemas import (
     UserCreditsUpdate, UserStatusUpdate,
 )
 from services.agent_service import run_multi_agent, AGENT_META
-from services.file_service import generate_markdown_file, generate_pdf_file, generate_brand_png
+from services.file_service import (
+    generate_markdown_file, generate_pdf_file,
+    generate_brand_png, generate_brand_psd, generate_pptx_file,
+)
+from services.image_service import generate_logo_image
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
 
@@ -56,7 +60,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Blank_WEB - 家具品牌战略AI平台",
+    title="Your Brand Consultant",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -163,6 +167,40 @@ def get_task(
         raise HTTPException(404, "任务不存在")
     if task.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权访问")
+
+    # Only return the LATEST generation run per agent_type.
+    # Each run starts with a content record (file_path IS NULL). Find the latest
+    # such record per agent, then include all result IDs >= that anchor.
+    latest_results = []
+    for agent_type in task.agents_selected:
+        # Latest content record for this agent
+        anchor = (
+            db.query(TaskResult)
+            .filter(
+                TaskResult.task_id == task_id,
+                TaskResult.agent_type == agent_type,
+                TaskResult.file_path == None,
+                TaskResult.content != None,
+            )
+            .order_by(TaskResult.id.desc())
+            .first()
+        )
+        if anchor:
+            # All records from this run: same agent_type, id >= anchor
+            run_results = (
+                db.query(TaskResult)
+                .filter(
+                    TaskResult.task_id == task_id,
+                    TaskResult.agent_type == agent_type,
+                    TaskResult.id >= anchor.id,
+                )
+                .order_by(TaskResult.id)
+                .all()
+            )
+            latest_results.extend(run_results)
+
+    # Override the ORM relationship with only the filtered results
+    task.results = latest_results
     return task
 
 
@@ -189,7 +227,15 @@ async def stream_task(
     if not task or task.user_id != user.id:
         raise HTTPException(404, "Task not found")
 
-    if task.status in ("completed", "failed"):
+    # Auto-fix: pending task with saved results means a previous run completed but
+    # status was never updated (e.g. client disconnected before all_done). Mark completed.
+    if task.status == "pending":
+        has_results = db.query(TaskResult).filter(TaskResult.task_id == task.id).first()
+        if has_results:
+            task.status = "completed"
+            db.commit()
+
+    if task.status in ("completed", "failed", "processing"):
         async def replay():
             yield {"data": json.dumps({"type": "already_done", "status": task.status})}
         return EventSourceResponse(replay())
@@ -227,7 +273,7 @@ async def stream_task(
                         task_id=task.id,
                         agent_type=agent_type,
                         content=full_content,
-                        download_credits=10,
+                        download_credits=0,
                     )
                     db.add(tr)
                     db.commit()
@@ -246,7 +292,7 @@ async def stream_task(
                             file_path=md_path,
                             file_type="md",
                             file_name=md_name,
-                            download_credits=5,
+                            download_credits=0,
                         )
                         db.add(md_result)
                         db.commit()
@@ -266,7 +312,7 @@ async def stream_task(
                             file_path=pdf_path,
                             file_type="pdf",
                             file_name=pdf_name,
-                            download_credits=10,
+                            download_credits=0,
                         )
                         db.add(pdf_result)
                         db.commit()
@@ -275,10 +321,41 @@ async def stream_task(
                     except Exception as e:
                         print(f"PDF gen error: {e}")
 
+                    # PPTX: for all agent types (AI-powered, async)
+                    try:
+                        pptx_path, pptx_name = await generate_pptx_file(
+                            task.id, agent_type, task.brand_name or "品牌", full_content, db=db
+                        )
+                        pptx_result = TaskResult(
+                            task_id=task.id,
+                            agent_type=agent_type,
+                            content=None,
+                            file_path=pptx_path,
+                            file_type="pptx",
+                            file_name=pptx_name,
+                            download_credits=0,
+                        )
+                        db.add(pptx_result)
+                        db.commit()
+                        db.refresh(pptx_result)
+                        files_generated.append({"id": pptx_result.id, "type": "pptx", "name": pptx_name})
+                    except Exception as e:
+                        print(f"PPTX gen error: {e}")
+
                     if agent_type == "brand":
+                        # Try AI logo generation (non-blocking, falls back to placeholder)
+                        ai_logo = None
+                        try:
+                            ai_logo = await generate_logo_image(
+                                task.brand_name or "品牌", full_content, db
+                            )
+                        except Exception as e:
+                            print(f"Logo generation skipped: {e}")
+
                         try:
                             png_path, png_name = generate_brand_png(
-                                task.id, task.brand_name or "品牌", full_content
+                                task.id, task.brand_name or "品牌", full_content,
+                                logo_image=ai_logo,
                             )
                             png_result = TaskResult(
                                 task_id=task.id,
@@ -287,7 +364,7 @@ async def stream_task(
                                 file_path=png_path,
                                 file_type="png",
                                 file_name=png_name,
-                                download_credits=15,
+                                download_credits=0,
                             )
                             db.add(png_result)
                             db.commit()
@@ -295,6 +372,27 @@ async def stream_task(
                             files_generated.append({"id": png_result.id, "type": "png", "name": png_name})
                         except Exception as e:
                             print(f"PNG gen error: {e}")
+
+                        try:
+                            psd_path, psd_name = generate_brand_psd(
+                                task.id, task.brand_name or "品牌", full_content,
+                                logo_image=ai_logo,
+                            )
+                            psd_result = TaskResult(
+                                task_id=task.id,
+                                agent_type=agent_type,
+                                content=None,
+                                file_path=psd_path,
+                                file_type="psd",
+                                file_name=psd_name,
+                                download_credits=0,
+                            )
+                            db.add(psd_result)
+                            db.commit()
+                            db.refresh(psd_result)
+                            files_generated.append({"id": psd_result.id, "type": "psd", "name": psd_name})
+                        except Exception as e:
+                            print(f"PSD gen error: {e}")
 
                     yield {"data": json.dumps({
                         "type": "agent_done",
@@ -314,6 +412,39 @@ async def stream_task(
             yield {"data": json.dumps({"type": "error", "message": str(e)})}
 
     return EventSourceResponse(event_generator())
+
+
+@app.post("/api/tasks/{task_id}/regenerate", tags=["tasks"])
+def regenerate_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reset a completed/failed task so it can be streamed again with fresh AI output."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    if task.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "无权操作")
+
+    # Remove generated files from disk
+    results = db.query(TaskResult).filter(TaskResult.task_id == task_id).all()
+    for r in results:
+        if r.file_path and os.path.exists(r.file_path):
+            try:
+                os.remove(r.file_path)
+            except Exception:
+                pass
+
+    # Delete all result records for this task
+    db.query(TaskResult).filter(TaskResult.task_id == task_id).delete()
+
+    # Reset task status
+    task.status = "pending"
+    task.completed_at = None
+    db.commit()
+    db.refresh(task)
+    return {"message": "任务已重置，可重新生成"}
 
 
 @app.delete("/api/tasks/{task_id}", tags=["tasks"])
@@ -372,6 +503,8 @@ def download_file(
         "md": "text/markdown",
         "pdf": "application/pdf",
         "png": "image/png",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "psd": "image/vnd.adobe.photoshop",
     }
     media_type = media_types.get(result.file_type, "application/octet-stream")
     return FileResponse(
@@ -460,6 +593,58 @@ def delete_llm_config(
     db.delete(config)
     db.commit()
     return {"message": "已删除"}
+
+
+# ── PPT Provider configuration ───────────────────────────────────────────────
+@app.get("/api/admin/ppt-provider", tags=["admin"])
+def get_ppt_provider_config(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.ppt_settings import load_config, redact
+    from services.ppt_providers import list_providers
+    return {
+        "config":    redact(load_config(db)),
+        "providers": list_providers(db),
+    }
+
+
+@app.put("/api/admin/ppt-provider", tags=["admin"])
+def update_ppt_provider_config(
+    body: dict,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.ppt_settings import save_config, load_config, redact
+    from services.ppt_providers import list_providers
+    # Don't clobber the existing key when the frontend sends back a mask
+    patch = dict(body or {})
+    existing = load_config(db)
+    k = patch.get("gamma_api_key")
+    if k is not None and ("..." in k or k == ""):
+        patch.pop("gamma_api_key", None)       # preserve existing
+    # Validate provider names
+    allowed = {"local", "gamma", "presenton"}
+    if "provider" in patch and patch["provider"] not in allowed:
+        raise HTTPException(400, f"Invalid provider, must be one of {allowed}")
+    if "fallback" in patch and patch["fallback"] not in allowed:
+        raise HTTPException(400, f"Invalid fallback, must be one of {allowed}")
+    save_config(db, patch)
+    return {
+        "config":    redact(load_config(db)),
+        "providers": list_providers(db),
+    }
+
+
+@app.post("/api/admin/ppt-provider/test", tags=["admin"])
+async def test_ppt_provider(
+    body: dict,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.ppt_providers import test_provider
+    name = (body or {}).get("provider", "local")
+    return await test_provider(name, db=db)
 
 
 # Knowledge Base

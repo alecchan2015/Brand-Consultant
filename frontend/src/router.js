@@ -23,6 +23,7 @@ const routes = [
       { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', component: () => import('./views/admin/Dashboard.vue') },
       { path: 'llm', component: () => import('./views/admin/LLMConfig.vue') },
+      { path: 'ppt-provider', component: () => import('./views/admin/PPTProvider.vue') },
       { path: 'knowledge', component: () => import('./views/admin/Knowledge.vue') },
       { path: 'users', component: () => import('./views/admin/Users.vue') },
       { path: 'tasks', component: () => import('./views/admin/Tasks.vue') },

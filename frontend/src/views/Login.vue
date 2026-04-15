@@ -3,8 +3,8 @@
     <div class="auth-card">
       <div class="brand">
         <span class="brand-icon">🪑</span>
-        <h1>Blank_WEB</h1>
-        <p>家具品牌战略 AI 平台</p>
+        <h1>Your Brand Consultant</h1>
+        <p>AI-Powered Brand Strategy Platform</p>
       </div>
 
       <el-tabs v-model="tab" class="auth-tabs">

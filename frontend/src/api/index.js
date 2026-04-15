@@ -32,6 +32,7 @@ export const tasksAPI = {
   create: (data) => api.post('/tasks', data),
   get: (id) => api.get(`/tasks/${id}`),
   delete: (id) => api.delete(`/tasks/${id}`),
+  regenerate: (id) => api.post(`/tasks/${id}/regenerate`),
 }
 
 // Files
@@ -58,6 +59,14 @@ export const adminAPI = {
   updateUserCredits: (id, data) => api.put(`/admin/users/${id}/credits`, data),
   updateUserStatus: (id, data) => api.put(`/admin/users/${id}/status`, data),
   getTasks: (params) => api.get('/admin/tasks', { params }),
+  // PPT Provider
+  getPPTProvider: () => api.get('/admin/ppt-provider'),
+  savePPTProvider: (data) => api.put('/admin/ppt-provider', data),
+  testPPTProvider: (provider) => api.post(
+    '/admin/ppt-provider/test',
+    { provider },
+    { timeout: 330000 },   // Gamma can take 1-5 min to render
+  ),
 }
 
 // Agents meta

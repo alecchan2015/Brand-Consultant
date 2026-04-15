@@ -12,6 +12,9 @@
         <el-menu-item index="/admin/llm">
           <el-icon><Setting /></el-icon><span>模型配置</span>
         </el-menu-item>
+        <el-menu-item index="/admin/ppt-provider">
+          <el-icon><Histogram /></el-icon><span>PPT 生成器</span>
+        </el-menu-item>
         <el-menu-item index="/admin/knowledge">
           <el-icon><Reading /></el-icon><span>知识库管理</span>
         </el-menu-item>
@@ -33,7 +36,7 @@
     </el-aside>
     <el-container>
       <el-header class="admin-header">
-        <span class="admin-title">Blank_WEB · 家具品牌战略AI平台 - 管理后台</span>
+        <span class="admin-title">Your Brand Consultant · 管理后台</span>
         <el-tag type="danger" effect="dark" size="small">管理员: {{ store.user?.username }}</el-tag>
       </el-header>
       <el-main class="admin-main">

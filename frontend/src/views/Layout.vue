@@ -3,7 +3,7 @@
     <el-aside width="220px" class="sidebar">
       <div class="logo">
         <span class="logo-icon">🪑</span>
-        <span class="logo-text">Blank_WEB</span>
+        <span class="logo-text">Your Brand Consultant</span>
       </div>
       <el-menu router :default-active="route.path" class="side-menu">
         <el-menu-item index="/dashboard">
@@ -28,7 +28,7 @@
     <el-container>
       <el-header class="app-header">
         <div class="header-left">
-          <span class="page-title">家具品牌战略 AI 平台</span>
+          <span class="page-title">Your Brand Consultant</span>
         </div>
         <div class="header-right">
           <el-tag type="success" effect="dark" v-if="store.isAdmin">管理员</el-tag>
