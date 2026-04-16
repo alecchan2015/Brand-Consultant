@@ -99,20 +99,20 @@ class GammaProvider(BasePPTProvider):
                        file_path, db=None) -> str:
         import httpx
 
-        headers = {"Content-Type": "application/json", "X-API-KEY": self.api_key}
-        body: Dict[str, Any] = {
+        # v1.0 API uses x-api-key header (not Authorization: Bearer)
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+        }
+        body = {
             "inputText":              f"# {brand_name}\n\n{content[:9000]}",
-            "textMode":               "generate",       # v0.2 enum
-            "format":                 "presentation",
+            "textMode":               "generate",
             "numCards":               self.num_cards,
             "cardSplit":              "auto",
-            "exportAs":               "pptx",
             "additionalInstructions": self.AGENT_INSTRUCTIONS.get(
                 agent_type, "撰写一份专业的商业策划演示文稿。"
             ),
         }
-        if self.theme_name:
-            body["themeName"] = self.theme_name
 
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(f"{self.BASE}/generations",
@@ -125,33 +125,55 @@ class GammaProvider(BasePPTProvider):
             if not gen_id:
                 raise RuntimeError(f"Gamma response missing generationId: {r.text[:500]}")
 
-            # Poll every 5s up to 300s (matches gamma-app-mcp defaults)
-            export_url: Optional[str] = None
-            for _ in range(60):
-                await asyncio.sleep(5)
-                p = await client.get(f"{self.BASE}/generations/{gen_id}",
-                                     headers=headers)
-                if p.status_code >= 400:
-                    continue
-                data = p.json()
-                status = (data.get("status") or "").lower()
-                if status in ("completed", "complete"):
-                    export_url = (
-                        data.get("exportUrl")
-                        or data.get("gammaUrl")
-                        or (data.get("export") or {}).get("url")
+            # Poll every 5s up to 300s
+            poll_client = httpx.AsyncClient(timeout=30)
+            gamma_url: Optional[str] = None
+            pptx_url: Optional[str] = None
+            try:
+                for _ in range(60):
+                    await asyncio.sleep(5)
+                    p = await poll_client.get(
+                        f"{self.BASE}/generations/{gen_id}", headers=headers
                     )
-                    if export_url:
+                    if p.status_code >= 400:
+                        continue
+                    data = p.json()
+                    status = (data.get("status") or "").lower()
+                    if status in ("completed", "complete"):
+                        # v1.0 API returns gammaUrl (web page); pptxExportUrl
+                        # may appear in future API versions
+                        pptx_url  = data.get("pptxExportUrl") or data.get("exportUrl")
+                        gamma_url = data.get("gammaUrl")
                         break
-                if status == "failed":
-                    raise RuntimeError(f"Gamma generation failed: {data.get('error') or data}")
-            if not export_url:
+                    if status == "failed":
+                        raise RuntimeError(
+                            f"Gamma generation failed: {data.get('error') or data}"
+                        )
+            finally:
+                await poll_client.aclose()
+
+            if not gamma_url and not pptx_url:
                 raise RuntimeError("Gamma generation timed out (>300s)")
 
-            # Download the PPTX
-            dl = await client.get(export_url, timeout=60)
-            dl.raise_for_status()
-            Path(file_path).write_bytes(dl.content)
+            if pptx_url:
+                # Direct PPTX download (future API versions)
+                dl = await httpx.AsyncClient(timeout=60).get(pptx_url)
+                dl.raise_for_status()
+                Path(file_path).write_bytes(dl.content)
+                print(f"[Gamma] PPTX downloaded from {pptx_url}")
+            else:
+                # v1.0 only provides a web URL — fall back to local PPTX renderer
+                # but embed the gamma_url as a reference slide
+                print(f"[Gamma] generation complete → {gamma_url}")
+                print("[Gamma] v1.0 API has no PPTX download; falling back to local renderer")
+                enhanced_content = (
+                    f"{content}\n\n---\n"
+                    f"> 📎 本演示文稿已同步生成 Gamma 在线版本：{gamma_url}"
+                )
+                from services.pptx_service import generate_pptx
+                await generate_pptx(task_id, agent_type, brand_name,
+                                    enhanced_content, file_path, db=db)
+
         return file_path
 
 
