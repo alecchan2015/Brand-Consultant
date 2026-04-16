@@ -1,6 +1,6 @@
-# Blank_WEB — 家具品牌战略 AI 平台
+# Brand Consultant — AI 品牌战略顾问平台
 
-> 基于多 Agent 协作的家具品牌战略全案生成系统，参考 Manus 交互范式，支持流式输出与多格式材料下载。
+> 基于多 Agent 协作的品牌战略全案生成系统，参考 Manus 交互范式，支持流式输出、多格式材料下载与 PPT 专业级演示文稿生成。
 
 ![Platform Preview](https://img.shields.io/badge/Platform-Web-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-green?style=flat-square&logo=python)
@@ -139,8 +139,8 @@ Blank_WEB/
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/alecchan2015/Blank_WEB.git
-cd Blank_WEB
+git clone https://github.com/alecchan2015/Brand-Consultant.git
+cd Brand-Consultant
 
 # 2. 配置环境变量（可选）
 echo "SECRET_KEY=$(openssl rand -hex 32)" > .env
@@ -241,7 +241,7 @@ Base URL: https://ark.volcengineapi.com/api/v3
 
 ```bash
 # .env
-DATABASE_URL=mysql+pymysql://user:password@localhost/blank_web
+DATABASE_URL=mysql+pymysql://user:password@localhost/brand_consultant
 ```
 
 ---
@@ -312,7 +312,7 @@ fc-list | grep -i wqy
 
 ## License
 
-MIT © 2026 Blank_WEB
+MIT © 2026 Brand Consultant
 
 ---
 
