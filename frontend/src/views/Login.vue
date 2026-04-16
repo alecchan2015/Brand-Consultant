@@ -21,7 +21,6 @@
               登 录
             </el-button>
           </el-form>
-          <div class="hint">默认管理员账号：adminccl / ccl@123</div>
         </el-tab-pane>
 
         <el-tab-pane label="注册" name="register">
@@ -127,7 +126,6 @@ async function handleRegister() {
 .brand p { font-size: 13px; color: #888; margin-top: 4px; }
 .auth-tabs { margin-top: 4px; }
 .w-full { width: 100%; margin-top: 8px; }
-.hint { text-align: center; font-size: 11px; color: #aaa; margin-top: 12px; }
 .auth-bg-text {
   position: absolute; inset: 0;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
