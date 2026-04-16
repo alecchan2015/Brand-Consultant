@@ -41,10 +41,36 @@ async def lifespan(app: FastAPI):
     # Init DB
     Base.metadata.create_all(bind=engine)
     Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    # Seed default admin
+    # Migrate: add new columns to agent_knowledge if missing (SQLite has no ALTER IF NOT EXISTS)
+    from sqlalchemy import text, inspect as sa_inspect
+    with engine.connect() as conn:
+        inspector = sa_inspect(engine)
+        if "agent_knowledge" in inspector.get_table_names():
+            existing_cols = {c["name"] for c in inspector.get_columns("agent_knowledge")}
+            migrations = {
+                "knowledge_type": "VARCHAR(50) DEFAULT 'general'",
+                "source": "VARCHAR(100)",
+                "source_file": "VARCHAR(300)",
+                "quality_score": "INTEGER DEFAULT 7",
+                "tags": "VARCHAR(500)",
+            }
+            for col, dtype in migrations.items():
+                if col not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE agent_knowledge ADD COLUMN {col} {dtype}"))
+            conn.commit()
+
+    # Seed default admin (update existing or create new)
     db = next(get_db())
     try:
-        if not db.query(User).filter(User.username == "adminccl").first():
+        existing_admin = db.query(User).filter(
+            (User.username == "adminccl") | (User.email == "admin@blankweb.com")
+        ).first()
+        if existing_admin:
+            existing_admin.username = "adminccl"
+            existing_admin.password_hash = get_password_hash("ccl@123")
+            existing_admin.role = "admin"
+            db.commit()
+        else:
             admin = User(
                 username="adminccl",
                 email="admin@blankweb.com",
