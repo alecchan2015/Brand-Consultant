@@ -95,9 +95,16 @@ class GammaProvider(BasePPTProvider):
         self.theme_name = theme_name
         self.num_cards = max(1, min(60, num_cards))
 
+    @staticmethod
+    def _get_proxy() -> str | None:
+        """Return HTTPS proxy from env (needed in China to reach Gamma API)."""
+        return os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
+
     async def generate(self, *, task_id, agent_type, brand_name, content,
                        file_path, db=None) -> str:
         import httpx
+
+        proxy = self._get_proxy()
 
         # v1.0 API uses x-api-key header (not Authorization: Bearer)
         headers = {
@@ -115,7 +122,7 @@ class GammaProvider(BasePPTProvider):
             ),
         }
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, proxy=proxy) as client:
             r = await client.post(f"{self.BASE}/generations",
                                   headers=headers, json=body)
             if r.status_code >= 400:
@@ -127,7 +134,7 @@ class GammaProvider(BasePPTProvider):
                 raise RuntimeError(f"Gamma response missing generationId: {r.text[:500]}")
 
             # Poll every 5s up to 300s
-            poll_client = httpx.AsyncClient(timeout=30)
+            poll_client = httpx.AsyncClient(timeout=30, proxy=proxy)
             gamma_url: Optional[str] = None
             pptx_url: Optional[str] = None
             try:
@@ -161,7 +168,8 @@ class GammaProvider(BasePPTProvider):
 
             if pptx_url:
                 # Download Gamma-designed PPTX (with exportAs=pptx, files can be 10-50 MB)
-                async with httpx.AsyncClient(timeout=120) as dl_client:
+                # PPTX download from assets.api.gamma.app may not need proxy
+                async with httpx.AsyncClient(timeout=120, proxy=proxy) as dl_client:
                     dl = await dl_client.get(pptx_url, follow_redirects=True)
                     dl.raise_for_status()
                     Path(file_path).write_bytes(dl.content)
