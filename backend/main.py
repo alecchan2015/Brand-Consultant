@@ -501,6 +501,26 @@ def download_file(
     db.add(tx)
     db.commit()
 
+    file_path = result.file_path
+    file_name = result.file_name
+
+    # Auto-ZIP for files > 10 MB
+    ZIP_THRESHOLD = 10 * 1024 * 1024  # 10 MB
+    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+    if file_size > ZIP_THRESHOLD:
+        import zipfile
+        zip_path = file_path + ".zip"
+        if not os.path.exists(zip_path) or os.path.getmtime(zip_path) < os.path.getmtime(file_path):
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(file_path, file_name)
+        zip_name = os.path.splitext(file_name)[0] + ".zip"
+        return FileResponse(
+            path=zip_path,
+            filename=zip_name,
+            media_type="application/zip",
+        )
+
     media_types = {
         "md": "text/markdown",
         "pdf": "application/pdf",
@@ -510,8 +530,8 @@ def download_file(
     }
     media_type = media_types.get(result.file_type, "application/octet-stream")
     return FileResponse(
-        path=result.file_path,
-        filename=result.file_name,
+        path=file_path,
+        filename=file_name,
         media_type=media_type,
     )
 

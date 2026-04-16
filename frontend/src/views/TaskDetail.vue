@@ -233,7 +233,12 @@ async function downloadFile(file) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = file.name
+    // If backend returned a ZIP (large file auto-compression), adjust filename
+    let downloadName = file.name
+    if (blob.type === 'application/zip' && !downloadName.endsWith('.zip')) {
+      downloadName = downloadName.replace(/\.[^.]+$/, '.zip')
+    }
+    a.download = downloadName
     a.click()
     URL.revokeObjectURL(url)
     await store.fetchMe()
