@@ -106,28 +106,35 @@ class LLMService:
             api_key=api_key,
             base_url=base_url if base_url else None
         )
-        # stream_options is only supported by OpenAI SDK >=1.14 and native OpenAI API;
-        # Volcano Engine and other compatible APIs may reject it.
-        kwargs = dict(
-            model=model_name,
-            messages=messages,
-            stream=True,
-            max_tokens=4096,
-        )
-        if not base_url:  # native OpenAI — safe to request usage
-            kwargs["stream_options"] = {"include_usage": True}
+        # Try with stream_options (OpenAI SDK >=1.14); fall back without it
+        # for older SDK versions or incompatible providers (Volcano, etc.)
+        kwargs = dict(model=model_name, messages=messages, stream=True, max_tokens=4096)
+        try:
+            stream = await client.chat.completions.create(
+                **kwargs, stream_options={"include_usage": True},
+            )
+        except TypeError:
+            stream = await client.chat.completions.create(**kwargs)
 
-        stream = await client.chat.completions.create(**kwargs)
+        completion_text = []
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
-            # OpenAI sends usage in the final chunk when stream_options.include_usage=True
+                text = chunk.choices[0].delta.content
+                completion_text.append(text)
+                yield text
+            # OpenAI sends usage in the final chunk when stream_options is supported
             if hasattr(chunk, 'usage') and chunk.usage and counter:
                 counter.update(
                     prompt=chunk.usage.prompt_tokens or 0,
                     completion=chunk.usage.completion_tokens or 0,
                     total=chunk.usage.total_tokens or 0,
                 )
+
+        # Fallback: estimate tokens if usage wasn't reported by the API
+        if counter and counter.total_tokens == 0 and completion_text:
+            est_comp = len("".join(completion_text)) // 2  # ~2 chars per CJK token
+            est_prompt = sum(len(m.get("content", "")) for m in messages) // 2
+            counter.update(prompt=est_prompt, completion=est_comp, total=est_prompt + est_comp)
 
     async def _stream_anthropic(
         self,
