@@ -14,14 +14,13 @@ services:
     container_name: brand_consultant_backend
     restart: always
     environment:
-      - DATABASE_URL=sqlite:///./brand_consultant.db
+      - DATABASE_URL=sqlite:////app/data/brand_consultant.db
       - SECRET_KEY=${SECRET_KEY:-change_me_in_production_please}
-      - UPLOAD_DIR=/app/uploads
+      - UPLOAD_DIR=/app/data/uploads
       - PPT_PROVIDER=${PPT_PROVIDER:-local}
       - PPT_FALLBACK=${PPT_FALLBACK:-local}
     volumes:
-      - ./data/brand_consultant.db:/app/brand_consultant.db
-      - ./data/uploads:/app/uploads
+      - ./data:/app/data
     ports:
       - "8001:8000"
     networks:
