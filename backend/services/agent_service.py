@@ -96,6 +96,8 @@ async def run_agent(
     brand_name: str,
     context: str,
     db: Session,
+    user_id: int = None,
+    task_id: int = None,
 ) -> AsyncGenerator[str, None]:
     """Run a single agent and stream its output"""
     from models import AgentKnowledge
@@ -130,6 +132,10 @@ async def run_agent(
         api_key=config.api_key,
         model_name=config.model_name,
         base_url=config.base_url,
+        db=db,
+        user_id=user_id,
+        task_id=task_id,
+        agent_type=agent_type,
     ):
         yield chunk
 
@@ -139,6 +145,8 @@ async def run_multi_agent(
     query: str,
     brand_name: str,
     db: Session,
+    user_id: int = None,
+    task_id: int = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Orchestrate multiple agents sequentially.
@@ -162,7 +170,10 @@ async def run_multi_agent(
         context = "\n\n".join(context_parts)
         full_content = []
 
-        async for chunk in run_agent(agent_type, query, brand_name, context, db):
+        async for chunk in run_agent(
+            agent_type, query, brand_name, context, db,
+            user_id=user_id, task_id=task_id,
+        ):
             full_content.append(chunk)
             yield {"type": "chunk", "agent": agent_type, "content": chunk}
 

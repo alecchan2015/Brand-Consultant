@@ -27,6 +27,7 @@ const routes = [
       { path: 'knowledge', component: () => import('./views/admin/Knowledge.vue') },
       { path: 'users', component: () => import('./views/admin/Users.vue') },
       { path: 'tasks', component: () => import('./views/admin/Tasks.vue') },
+      { path: 'token-usage', component: () => import('./views/admin/TokenUsage.vue') },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from database import Base, engine, get_db
-from models import User, LLMConfig, AgentKnowledge, Task, TaskResult, CreditTransaction
+from models import User, LLMConfig, AgentKnowledge, Task, TaskResult, CreditTransaction, TokenUsage
 from auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_user, get_current_admin
@@ -251,6 +251,8 @@ async def stream_task(
                 query=task.query,
                 brand_name=task.brand_name or "",
                 db=db,
+                user_id=user.id,
+                task_id=task.id,
             ):
                 etype = event.get("type")
                 if etype == "agent_start":
@@ -536,12 +538,19 @@ def preview_file(
 
 @app.get("/api/admin/stats", tags=["admin"])
 def admin_stats(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    from sqlalchemy import func
+    token_stats = db.query(
+        func.sum(TokenUsage.total_tokens),
+        func.count(TokenUsage.id),
+    ).first()
     return {
         "total_users": db.query(User).filter(User.role == "user").count(),
         "total_tasks": db.query(Task).count(),
         "completed_tasks": db.query(Task).filter(Task.status == "completed").count(),
         "total_llm_configs": db.query(LLMConfig).filter(LLMConfig.is_active == True).count(),
         "total_knowledge": db.query(AgentKnowledge).filter(AgentKnowledge.is_active == True).count(),
+        "total_tokens": token_stats[0] or 0,
+        "total_llm_calls": token_stats[1] or 0,
     }
 
 
@@ -763,6 +772,191 @@ def admin_list_tasks(
         .limit(limit)
         .all()
     )
+
+
+# ─────────────────────────────────────────────
+# Token Usage Admin Routes
+# ─────────────────────────────────────────────
+
+@app.get("/api/admin/token-usage", tags=["admin"])
+def get_token_usage(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    user_id: Optional[int] = None,
+    model_name: Optional[str] = None,
+    provider: Optional[str] = None,
+    agent_type: Optional[str] = None,
+    date_from: Optional[str] = None,   # YYYY-MM-DD
+    date_to: Optional[str] = None,     # YYYY-MM-DD
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    """Paginated + filterable token usage records."""
+    from sqlalchemy import func
+    q = db.query(TokenUsage)
+
+    if user_id:
+        q = q.filter(TokenUsage.user_id == user_id)
+    if model_name:
+        q = q.filter(TokenUsage.model_name == model_name)
+    if provider:
+        q = q.filter(TokenUsage.provider == provider)
+    if agent_type:
+        q = q.filter(TokenUsage.agent_type == agent_type)
+    if date_from:
+        try:
+            q = q.filter(TokenUsage.created_at >= datetime.strptime(date_from, "%Y-%m-%d"))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end = datetime.strptime(date_to, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            q = q.filter(TokenUsage.created_at <= end)
+        except ValueError:
+            pass
+
+    total = q.count()
+    records = (
+        q.order_by(TokenUsage.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    # Resolve usernames
+    user_ids = {r.user_id for r in records if r.user_id}
+    users_map = {}
+    if user_ids:
+        users = db.query(User.id, User.username).filter(User.id.in_(user_ids)).all()
+        users_map = {u.id: u.username for u in users}
+
+    items = []
+    for r in records:
+        items.append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "username": users_map.get(r.user_id, "-"),
+            "task_id": r.task_id,
+            "agent_type": r.agent_type,
+            "provider": r.provider,
+            "model_name": r.model_name,
+            "prompt_tokens": r.prompt_tokens,
+            "completion_tokens": r.completion_tokens,
+            "total_tokens": r.total_tokens,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@app.get("/api/admin/token-usage/summary", tags=["admin"])
+def get_token_usage_summary(
+    user_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    """Aggregated token usage summary grouped by model and by date."""
+    from sqlalchemy import func, cast, Date
+
+    q = db.query(TokenUsage)
+    if user_id:
+        q = q.filter(TokenUsage.user_id == user_id)
+    if date_from:
+        try:
+            q = q.filter(TokenUsage.created_at >= datetime.strptime(date_from, "%Y-%m-%d"))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end = datetime.strptime(date_to, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            q = q.filter(TokenUsage.created_at <= end)
+        except ValueError:
+            pass
+
+    # By model
+    by_model = (
+        q.with_entities(
+            TokenUsage.provider,
+            TokenUsage.model_name,
+            func.sum(TokenUsage.prompt_tokens).label("prompt_tokens"),
+            func.sum(TokenUsage.completion_tokens).label("completion_tokens"),
+            func.sum(TokenUsage.total_tokens).label("total_tokens"),
+            func.count(TokenUsage.id).label("call_count"),
+        )
+        .group_by(TokenUsage.provider, TokenUsage.model_name)
+        .all()
+    )
+
+    # By date (last 30 days)
+    by_date = (
+        q.with_entities(
+            func.date(TokenUsage.created_at).label("date"),
+            func.sum(TokenUsage.total_tokens).label("total_tokens"),
+            func.count(TokenUsage.id).label("call_count"),
+        )
+        .group_by(func.date(TokenUsage.created_at))
+        .order_by(func.date(TokenUsage.created_at).desc())
+        .limit(30)
+        .all()
+    )
+
+    # Grand totals
+    totals = q.with_entities(
+        func.sum(TokenUsage.prompt_tokens),
+        func.sum(TokenUsage.completion_tokens),
+        func.sum(TokenUsage.total_tokens),
+        func.count(TokenUsage.id),
+    ).first()
+
+    return {
+        "totals": {
+            "prompt_tokens": totals[0] or 0,
+            "completion_tokens": totals[1] or 0,
+            "total_tokens": totals[2] or 0,
+            "call_count": totals[3] or 0,
+        },
+        "by_model": [
+            {
+                "provider": r.provider,
+                "model_name": r.model_name,
+                "prompt_tokens": r.prompt_tokens or 0,
+                "completion_tokens": r.completion_tokens or 0,
+                "total_tokens": r.total_tokens or 0,
+                "call_count": r.call_count or 0,
+            }
+            for r in by_model
+        ],
+        "by_date": [
+            {
+                "date": str(r.date),
+                "total_tokens": r.total_tokens or 0,
+                "call_count": r.call_count or 0,
+            }
+            for r in by_date
+        ],
+    }
+
+
+@app.get("/api/admin/token-usage/filters", tags=["admin"])
+def get_token_usage_filters(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    """Return distinct values for filter dropdowns."""
+    models = db.query(TokenUsage.model_name).distinct().all()
+    providers = db.query(TokenUsage.provider).distinct().all()
+    users = (
+        db.query(User.id, User.username)
+        .filter(User.id.in_(db.query(TokenUsage.user_id).filter(TokenUsage.user_id != None).distinct()))
+        .all()
+    )
+    return {
+        "models": [m[0] for m in models],
+        "providers": [p[0] for p in providers],
+        "users": [{"id": u.id, "username": u.username} for u in users],
+    }
 
 
 # ─────────────────────────────────────────────

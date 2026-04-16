@@ -24,6 +24,9 @@
         <el-menu-item index="/admin/tasks">
           <el-icon><List /></el-icon><span>任务记录</span>
         </el-menu-item>
+        <el-menu-item index="/admin/token-usage">
+          <el-icon><Odometer /></el-icon><span>Token 用量</span>
+        </el-menu-item>
       </el-menu>
       <div class="sidebar-bottom">
         <el-button text size="small" @click="$router.push('/dashboard')" style="color:#aaa">

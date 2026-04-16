@@ -59,6 +59,10 @@ export const adminAPI = {
   updateUserCredits: (id, data) => api.put(`/admin/users/${id}/credits`, data),
   updateUserStatus: (id, data) => api.put(`/admin/users/${id}/status`, data),
   getTasks: (params) => api.get('/admin/tasks', { params }),
+  // Token Usage
+  getTokenUsage: (params) => api.get('/admin/token-usage', { params }),
+  getTokenUsageSummary: (params) => api.get('/admin/token-usage/summary', { params }),
+  getTokenUsageFilters: () => api.get('/admin/token-usage/filters'),
   // PPT Provider
   getPPTProvider: () => api.get('/admin/ppt-provider'),
   savePPTProvider: (data) => api.put('/admin/ppt-provider', data),

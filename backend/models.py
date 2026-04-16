@@ -85,6 +85,24 @@ class SystemSetting(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TokenUsage(Base):
+    """Track token consumption per LLM API call."""
+    __tablename__ = "token_usages"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    agent_type = Column(String(50), nullable=True)   # strategy / brand / operations
+    provider = Column(String(50), nullable=False)     # openai / anthropic / volcano
+    model_name = Column(String(100), nullable=False)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User", backref="token_usages")
+    task = relationship("Task", backref="token_usages")
+
+
 class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
     id = Column(Integer, primary_key=True, index=True)
