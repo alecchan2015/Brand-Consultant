@@ -188,11 +188,16 @@ async function loadPlans() {
 async function loadMembershipCfg() {
   try {
     const cfg = await adminAPI.getMembershipConfig()
-    // Ensure all tiers have defaults
-    ['vip', 'vvip', 'vvvip'].forEach(t => {
-      if (!cfg.tier_features?.[t]) cfg.tier_features[t] = []
-      if (!cfg.support_info?.[t]) cfg.support_info[t] = { name: '', wechat: '', phone: '', email: '' }
-    })
+    // Ensure all tiers have defaults. NOTE: leading semicolon prevents ASI
+    // from treating the array literal below as a property access on `cfg`.
+    cfg.tier_features = cfg.tier_features || {}
+    cfg.support_info = cfg.support_info || {}
+    for (const t of ['vip', 'vvip', 'vvvip']) {
+      if (!Array.isArray(cfg.tier_features[t])) cfg.tier_features[t] = []
+      if (!cfg.support_info[t]) {
+        cfg.support_info[t] = { name: '', wechat: '', phone: '', email: '' }
+      }
+    }
     Object.assign(membershipCfg, cfg)
   } catch (e) {
     ElMessage.error('加载配置失败: ' + e.message)
