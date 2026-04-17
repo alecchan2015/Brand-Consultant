@@ -111,16 +111,20 @@ const submitting = ref(false)
 const form = ref({ query: '', brand_name: '', agents_selected: ['strategy', 'brand', 'operations'] })
 
 const agents = ref([
-  { type: 'strategy',    name: '战略规划专家', icon: '🎯', desc: '市场分析·竞争定位·品牌战略规划' },
-  { type: 'brand',       name: '品牌设计专家', icon: '🎨', desc: 'Logo概念·色彩体系·视觉物料规范' },
-  { type: 'logo_design', name: 'Logo 设计专家', icon: '✨', desc: 'AI智能生成Logo，输出 PNG/PSD/SVG' },
-  { type: 'operations',  name: '运营实施专家', icon: '🚀', desc: '渠道策略·营销计划·执行路径' },
+  { type: 'strategy',      name: '战略规划专家', icon: '🎯', desc: '市场分析·竞争定位·品牌战略规划' },
+  { type: 'brand',         name: '品牌设计专家', icon: '🎨', desc: 'Logo概念·色彩体系·视觉物料规范' },
+  { type: 'logo_design',   name: 'Logo 设计专家', icon: '✨', desc: 'AI智能生成Logo，输出 PNG/PSD/SVG' },
+  { type: 'poster_design', name: '海报设计专家', icon: '🖼️', desc: '节气/节日商业海报，9:16 竖版 2160×3840' },
+  { type: 'operations',    name: '运营实施专家', icon: '🚀', desc: '渠道策略·营销计划·执行路径' },
 ])
 
-const agentNames = { strategy: '战略规划', brand: '品牌设计', logo_design: 'Logo设计', operations: '运营实施' }
+const agentNames = {
+  strategy: '战略规划', brand: '品牌设计',
+  logo_design: 'Logo设计', poster_design: '海报设计', operations: '运营实施',
+}
 
 const selectedAgentNames = computed(() =>
-  ['strategy', 'brand', 'logo_design', 'operations']
+  ['strategy', 'brand', 'logo_design', 'poster_design', 'operations']
     .filter(a => form.value.agents_selected.includes(a))
     .map(a => agentNames[a])
 )

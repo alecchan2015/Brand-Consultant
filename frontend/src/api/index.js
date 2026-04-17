@@ -109,6 +109,15 @@ export const adminAPI = {
     { timeout: 120000 },
   ),
 
+  // Poster Provider
+  getPosterProvider: () => api.get('/admin/poster-provider'),
+  savePosterProvider: (data) => api.put('/admin/poster-provider', data),
+  testPosterProvider: (provider) => api.post(
+    '/admin/poster-provider/test',
+    { provider },
+    { timeout: 300000 },  // FLUX can take 1-2min
+  ),
+
   // ─── Auth / Registration policy (admin) ───
   getAuthConfig:      () => api.get('/admin/auth/config'),
   saveAuthConfig:     (data) => api.put('/admin/auth/config', data),
@@ -159,6 +168,18 @@ export const logoAPI = {
     const token = localStorage.getItem('token') || ''
     return `/api/logo/download/${id}?format=${encodeURIComponent(format)}&token=${encodeURIComponent(token)}`
   },
+}
+
+// Poster
+export const posterAPI = {
+  generate:    (data) => api.post('/poster/generate', data),
+  progressUrl: (id, token) => `/api/poster/progress/${id}?token=${token}`,
+  downloadUrl: (id) => {
+    const token = localStorage.getItem('token') || ''
+    return `/api/poster/download/${id}?token=${encodeURIComponent(token)}`
+  },
+  fileUrl: (fname) => `/api${fname.startsWith('/') ? fname : '/poster/file/' + fname}`,
+  history: (page = 1, page_size = 10) => api.get('/poster/history', { params: { page, page_size } }),
 }
 
 // Agents meta

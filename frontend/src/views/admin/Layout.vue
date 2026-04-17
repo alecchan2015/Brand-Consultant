@@ -45,6 +45,9 @@
         <el-menu-item index="/admin/logo-provider">
           <el-icon><PictureFilled /></el-icon><span>Logo 生成器</span>
         </el-menu-item>
+        <el-menu-item index="/admin/poster-provider">
+          <el-icon><Picture /></el-icon><span>海报生成器</span>
+        </el-menu-item>
       </el-menu>
       <div class="sidebar-bottom">
         <el-button text size="small" @click="$router.push('/dashboard')" style="color:#aaa">

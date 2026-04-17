@@ -97,7 +97,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../store'
 import { ElMessageBox } from 'element-plus'
 import {
-  Grid, Plus, PictureFilled, Star, Tickets, SwitchButton,
+  Grid, Plus, PictureFilled, Picture, Star, Tickets, SwitchButton,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -116,6 +116,7 @@ const navItems = computed(() => {
     { path: '/dashboard',  label: '工作台',   icon: markRaw(Grid) },
     { path: '/tasks/new',  label: '新建任务', icon: markRaw(Plus) },
     { path: '/logo',       label: 'Logo 生成', icon: markRaw(PictureFilled) },
+    { path: '/poster',     label: '海报生成',  icon: markRaw(Picture) },
     {
       path: '/membership',
       label: '会员升级',
@@ -132,6 +133,7 @@ const PAGE_TITLES = {
   '/dashboard':      '工作台',
   '/tasks/new':      '新建任务',
   '/logo':           'Logo 生成',
+  '/poster':         '海报生成',
   '/membership':     '会员中心',
   '/orders':         '我的订单',
 }

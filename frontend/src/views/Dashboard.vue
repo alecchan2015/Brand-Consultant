@@ -103,10 +103,10 @@ const loading = ref(false)
 
 const agentNames = {
   strategy: '战略规划', brand: '品牌设计',
-  operations: '运营实施', logo_design: 'Logo设计',
+  operations: '运营实施', logo_design: 'Logo设计', poster_design: '海报设计',
 }
 const agentIcons = {
-  strategy: '🎯', brand: '🎨', logo_design: '✨', operations: '🚀',
+  strategy: '🎯', brand: '🎨', logo_design: '✨', poster_design: '🖼️', operations: '🚀',
 }
 const statusLabel = { pending: '待处理', processing: '进行中', completed: '已完成', failed: '失败' }
 
@@ -307,6 +307,7 @@ onMounted(async () => {
 .agent-chip.a-strategy   { border-color: rgba(59, 130, 246, 0.3); color: #93c5fd; background: rgba(59, 130, 246, 0.08); }
 .agent-chip.a-brand      { border-color: rgba(168, 85, 247, 0.3); color: #d8b4fe; background: rgba(168, 85, 247, 0.08); }
 .agent-chip.a-logo_design{ border-color: rgba(236, 72, 153, 0.3); color: #f9a8d4; background: rgba(236, 72, 153, 0.08); }
+.agent-chip.a-poster_design { border-color: rgba(14, 165, 233, 0.35); color: #7dd3fc; background: rgba(14, 165, 233, 0.08); }
 .agent-chip.a-operations { border-color: rgba(245, 158, 11, 0.3); color: #fcd34d; background: rgba(245, 158, 11, 0.08); }
 
 .status-dot {

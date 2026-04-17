@@ -126,14 +126,14 @@ const agentFiles = ref({})
 const regenerating = ref(false)
 let es = null
 
-const agentNames = { strategy: '战略规划专家', brand: '品牌设计专家', logo_design: 'Logo 设计专家', operations: '运营实施专家' }
-const agentIcon  = { strategy: '🎯', brand: '🎨', logo_design: '✨', operations: '🚀' }
+const agentNames = { strategy: '战略规划专家', brand: '品牌设计专家', logo_design: 'Logo 设计专家', poster_design: '海报设计专家', operations: '运营实施专家' }
+const agentIcon  = { strategy: '🎯', brand: '🎨', logo_design: '✨', poster_design: '🖼️', operations: '🚀' }
 const statusLabel = { pending: '待处理', processing: '进行中', completed: '已完成', failed: '失败' }
 const fileIcon = { md: '📄', pdf: '📕', png: '🖼️', pptx: '📊', psd: '🎨' }
 
 const orderedAgents = computed(() => {
   if (!task.value) return []
-  return ['strategy', 'brand', 'logo_design', 'operations'].filter(a => task.value.agents_selected.includes(a))
+  return ['strategy', 'brand', 'logo_design', 'poster_design', 'operations'].filter(a => task.value.agents_selected.includes(a))
 })
 
 function renderMd(text) { return marked.parse(text || '', { breaks: true }) }
@@ -355,6 +355,7 @@ onUnmounted(() => { if (es) es.close() })
 .agent-chip.a-strategy   { border-color: rgba(59, 130, 246, 0.3); color: #93c5fd; background: rgba(59, 130, 246, 0.08); }
 .agent-chip.a-brand      { border-color: rgba(168, 85, 247, 0.3); color: #d8b4fe; background: rgba(168, 85, 247, 0.08); }
 .agent-chip.a-logo_design{ border-color: rgba(236, 72, 153, 0.3); color: #f9a8d4; background: rgba(236, 72, 153, 0.08); }
+.agent-chip.a-poster_design { border-color: rgba(14, 165, 233, 0.35); color: #7dd3fc; background: rgba(14, 165, 233, 0.08); }
 .agent-chip.a-operations { border-color: rgba(245, 158, 11, 0.3); color: #fcd34d; background: rgba(245, 158, 11, 0.08); }
 
 /* ── Results ───────────────────────────────────────────────── */

@@ -218,6 +218,39 @@ class CreditTransaction(Base):
     user = relationship("User", back_populates="credit_transactions")
 
 
+class PosterGeneration(Base):
+    """Standalone poster generation (festival/event posters for brands).
+
+    Mirrors LogoGeneration structure. Pipeline: background image generation
+    → Pillow composition overlaying product + logo + brand info → Claude
+    Vision quality check → final PNG output (2160×3840 default, 9:16 portrait).
+    """
+    __tablename__ = "poster_generations"
+    id                  = Column(Integer, primary_key=True, index=True)
+    user_id             = Column(Integer, ForeignKey("users.id"), nullable=False)
+    brand_name          = Column(String(200), nullable=False)
+    event_keyword       = Column(String(100), nullable=True)   # 节气/节日关键词 e.g. "谷雨"
+    headline            = Column(String(200), nullable=True)   # main headline text
+    subline             = Column(String(300), nullable=True)   # sub-headline / slogan
+    industry            = Column(String(100), nullable=True)
+    style               = Column(String(50), default="natural")
+    size                = Column(String(20), default="portrait")  # portrait | square | landscape | story
+    primary_color       = Column(String(20), nullable=True)
+    product_image_url   = Column(String(500), nullable=True)   # optional reference
+    prompt_optimized    = Column(Text, nullable=True)
+    status              = Column(String(20), default="processing")  # processing | done | failed
+    provider            = Column(String(50), nullable=True)
+    error_msg           = Column(Text, nullable=True)
+    variants            = Column(JSON, nullable=True)  # [{index, png_url}]
+    png_path            = Column(String(500), nullable=True)
+    credits_charged     = Column(Integer, default=5)
+    quality_feedback    = Column(Text, nullable=True)  # Claude Vision quality review (future)
+    created_at          = Column(DateTime, default=datetime.utcnow)
+    completed_at        = Column(DateTime, nullable=True)
+
+    user = relationship("User", backref="poster_generations")
+
+
 class LogoGeneration(Base):
     __tablename__ = "logo_generations"
     id = Column(Integer, primary_key=True, index=True)

@@ -26,6 +26,11 @@ AGENT_META = {
         "icon": "🚀",
         "system_prompt": ENHANCED_PROMPTS["operations"],
     },
+    "poster_design": {
+        "name": "海报设计专家",
+        "icon": "🖼️",
+        "system_prompt": "",  # Poster agent — AI image pipeline, handled in main.py
+    },
 }
 
 

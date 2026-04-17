@@ -261,12 +261,13 @@ const agents = ref([
   { type: 'strategy', name: '战略规划', icon: '🎯', desc: '市场分析·竞争定位·品牌战略' },
   { type: 'brand', name: '品牌设计', icon: '🎨', desc: 'VI体系·色彩规范·视觉物料' },
   { type: 'logo_design', name: 'Logo设计', icon: '✨', desc: 'AI生成Logo·多格式输出' },
+  { type: 'poster_design', name: '海报设计', icon: '🖼️', desc: '节气商业海报·9:16 竖版' },
   { type: 'operations', name: '运营实施', icon: '🚀', desc: '渠道策略·营销计划·执行路径' },
 ])
 
-const agentNameMap = { strategy: '战略规划', brand: '品牌设计', logo_design: 'Logo设计', operations: '运营实施' }
+const agentNameMap = { strategy: '战略规划', brand: '品牌设计', logo_design: 'Logo设计', poster_design: '海报设计', operations: '运营实施' }
 const selectedAgentNames = computed(() =>
-  ['strategy', 'brand', 'logo_design', 'operations']
+  ['strategy', 'brand', 'logo_design', 'poster_design', 'operations']
     .filter(a => form.value.agents_selected.includes(a))
     .map(a => agentNameMap[a])
 )
@@ -390,6 +391,7 @@ onMounted(async () => {
           strategy: '市场分析·竞争定位·品牌战略',
           brand: 'VI体系·色彩规范·视觉物料',
           logo_design: 'AI生成Logo·多格式输出',
+          poster_design: '节气商业海报·9:16 竖版',
           operations: '渠道策略·营销计划·执行路径',
         }[a.type] || ''
       }))

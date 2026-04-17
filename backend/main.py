@@ -16,7 +16,7 @@ from sse_starlette.sse import EventSourceResponse
 from database import Base, engine, get_db
 from models import (
     User, LLMConfig, AgentKnowledge, Task, TaskResult, CreditTransaction,
-    TokenUsage, LogoGeneration, MembershipPlan, PaymentOrder,
+    TokenUsage, LogoGeneration, PosterGeneration, MembershipPlan, PaymentOrder,
 )
 from auth import (
     get_password_hash, verify_password, create_access_token,
@@ -628,7 +628,7 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    valid_agents = {"strategy", "brand", "logo_design", "operations"}
+    valid_agents = {"strategy", "brand", "logo_design", "poster_design", "operations"}
     agents = [a for a in body.agents_selected if a in valid_agents]
     if not agents:
         raise HTTPException(400, "请至少选择一个Agent专家")
@@ -1132,6 +1132,159 @@ async def stream_task(
                     "agent": "logo_design",
                     "result_id": logo_tr.id,
                     "files": logo_files,
+                })}
+
+            # ── Poster Design Agent (runs after LLM + logo agents) ────
+            if "poster_design" in (task.agents_selected or []):
+                yield {"data": json.dumps({
+                    "type": "agent_start",
+                    "agent": "poster_design",
+                    "name": "海报设计专家",
+                })}
+                yield {"data": json.dumps({
+                    "type": "chunk",
+                    "agent": "poster_design",
+                    "content": "🖼️ 正在为您的品牌生成商业海报...\n\n",
+                })}
+
+                poster_files = []
+                poster_parts = []
+                try:
+                    from services.poster_providers import generate_via_providers as run_poster
+                    from services.poster_settings import load_config as load_poster_cfg, get_size
+                    from services.poster_service import compose_poster, _download_image, _image_from_b64
+                    from services.credits_settings import get_download_credits
+                    from services.file_service import sanitize_filename, ensure_upload_dir
+
+                    ensure_upload_dir()
+                    poster_cfg = load_poster_cfg(db)
+                    brand_name = task.brand_name or "品牌"
+
+                    # Infer event keyword from the query — simple heuristic
+                    event_keyword = ""
+                    for kw in ["立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
+                               "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+                               "立秋", "处暑", "白露", "秋分", "寒露", "霜降",
+                               "立冬", "小雪", "大雪", "冬至", "小寒", "大寒",
+                               "春节", "元宵", "端午", "中秋", "重阳", "七夕"]:
+                        if kw in (task.query or ""):
+                            event_keyword = kw
+                            break
+                    if not event_keyword:
+                        event_keyword = "新品"  # generic fallback
+
+                    # Reuse strategy/brand output for color hint
+                    brand_content = agent_contents.get("brand", "")
+                    primary_color = ""
+                    import re as _re
+                    hex_match = _re.findall(r'#([A-Fa-f0-9]{6})', brand_content)
+                    if hex_match:
+                        primary_color = f"#{hex_match[0]}"
+
+                    industry = ""
+                    for kw, ind in [("家具", "家居家具"), ("美妆", "美妆护肤"),
+                                    ("科技", "科技智能"), ("食品", "食品饮料"),
+                                    ("服装", "服装时尚")]:
+                        if kw in (task.query or ""):
+                            industry = ind
+                            break
+
+                    style = poster_cfg.get("default_style", "natural")
+                    target_size = get_size(poster_cfg, "portrait")
+
+                    yield {"data": json.dumps({
+                        "type": "chunk",
+                        "agent": "poster_design",
+                        "content": f"**主题**: {event_keyword}\n**风格**: {style}\n**尺寸**: {target_size[0]}×{target_size[1]} (9:16)\n\n⏳ 正在生成海报背景...\n\n",
+                    })}
+
+                    result, provider_name = await run_poster(
+                        brand_name=brand_name,
+                        event_keyword=event_keyword,
+                        style=style,
+                        variant_count=1,
+                        size=target_size,
+                        industry=industry,
+                        primary_color=primary_color,
+                        db=db,
+                    )
+
+                    if result.success and result.variants:
+                        poster_parts.append(
+                            f"✅ 海报背景生成完成！\n\n"
+                            f"- **生成引擎**: {provider_name}\n\n"
+                            f"⏳ 正在合成品牌图层...\n\n"
+                        )
+                        yield {"data": json.dumps({"type": "chunk", "agent": "poster_design", "content": poster_parts[-1]})}
+
+                        from datetime import datetime as _dt
+                        ts = _dt.now().strftime("%Y%m%d%H%M%S")
+                        safe_brand = sanitize_filename(brand_name)
+                        for v in result.variants:
+                            bg = None
+                            if v.get("png_url"):
+                                bg = await _download_image(v["png_url"])
+                            elif v.get("png_b64"):
+                                bg = _image_from_b64(v["png_b64"])
+                            if bg is None:
+                                continue
+                            poster_img = compose_poster(
+                                background=bg, target_size=target_size,
+                                brand_name=brand_name,
+                                headline=event_keyword,
+                                subline=f"{brand_name} · 节气呈现",
+                                event_date=_dt.now().strftime("%Y.%m.%d"),
+                                logo=None,
+                                primary_color=primary_color or None,
+                                add_footer=poster_cfg.get("add_footer", True),
+                            )
+                            fname = f"{safe_brand}_poster_{event_keyword}_{ts}.png"
+                            fpath = os.path.join(UPLOAD_DIR, fname)
+                            poster_img.save(fpath, format="PNG", optimize=True)
+
+                            pr = TaskResult(
+                                task_id=task.id,
+                                agent_type="poster_design",
+                                content=None,
+                                file_path=fpath,
+                                file_type="png",
+                                file_name=fname,
+                                download_credits=get_download_credits(db, "poster_png"),
+                            )
+                            db.add(pr)
+                            db.commit()
+                            db.refresh(pr)
+                            poster_files.append({"id": pr.id, "type": "png", "name": fname})
+                            poster_parts.append(f"- 海报: `{fname}` ✅\n")
+                            yield {"data": json.dumps({"type": "chunk", "agent": "poster_design", "content": poster_parts[-1]})}
+                    else:
+                        err = f"❌ 海报生成失败: {result.error}\n"
+                        poster_parts.append(err)
+                        yield {"data": json.dumps({"type": "chunk", "agent": "poster_design", "content": err})}
+
+                except Exception as e:
+                    err = f"❌ 海报生成出错: {e}\n"
+                    poster_parts.append(err)
+                    yield {"data": json.dumps({"type": "chunk", "agent": "poster_design", "content": err})}
+                    print(f"[Poster] Task agent error: {e}")
+
+                # Save a summary TaskResult
+                full_poster_content = "".join(poster_parts)
+                poster_tr = TaskResult(
+                    task_id=task.id,
+                    agent_type="poster_design",
+                    content=full_poster_content,
+                    download_credits=0,
+                )
+                db.add(poster_tr)
+                db.commit()
+                db.refresh(poster_tr)
+
+                yield {"data": json.dumps({
+                    "type": "agent_done",
+                    "agent": "poster_design",
+                    "result_id": poster_tr.id,
+                    "files": poster_files,
                 })}
 
             task.status = "completed"
@@ -2717,6 +2870,325 @@ def logo_history(
                 "has_png": bool(g.png_path),
                 "has_psd": bool(g.psd_path),
                 "has_zip": bool(g.brand_kit_path),
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+            }
+            for g in items
+        ],
+    }
+
+
+# ─────────────────────────────────────────────
+# Poster Provider Config (Admin)
+# ─────────────────────────────────────────────
+@app.get("/api/admin/poster-provider", tags=["admin"])
+def get_poster_provider_config(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.poster_settings import load_config, redact
+    from services.poster_providers import list_providers
+    return {
+        "config":    redact(load_config(db)),
+        "providers": list_providers(db),
+    }
+
+
+@app.put("/api/admin/poster-provider", tags=["admin"])
+def update_poster_provider_config(
+    body: dict,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.poster_settings import save_config, load_config, redact
+    from services.poster_providers import list_providers
+    patch = dict(body or {})
+    for key_field in ("openai_api_key", "flux_api_key", "jimeng_api_key",
+                      "ideogram_api_key", "removebg_api_key"):
+        val = patch.get(key_field)
+        if val is not None and ("..." in val or val == ""):
+            patch.pop(key_field, None)
+    allowed = {"openai", "flux", "jimeng"}
+    if "provider" in patch and patch["provider"] not in allowed:
+        raise HTTPException(400, f"Invalid provider, must be one of {allowed}")
+    if "fallback" in patch and patch["fallback"] not in allowed:
+        raise HTTPException(400, f"Invalid fallback, must be one of {allowed}")
+    save_config(db, patch)
+    return {
+        "config":    redact(load_config(db)),
+        "providers": list_providers(db),
+    }
+
+
+@app.post("/api/admin/poster-provider/test", tags=["admin"])
+async def test_poster_provider_route(
+    body: dict,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.poster_providers import test_provider
+    name = (body or {}).get("provider", "openai")
+    return await test_provider(name, db=db)
+
+
+# ─────────────────────────────────────────────
+# Poster Generation (User-facing)
+# ─────────────────────────────────────────────
+@app.post("/api/poster/generate", tags=["poster"])
+async def generate_poster(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Submit a poster generation job. Returns generation_id for progress polling."""
+    from services.credits_settings import load_config as load_credits_config
+
+    brand_name = (body.get("brand_name") or "").strip()
+    if not brand_name:
+        raise HTTPException(400, "brand_name is required")
+
+    event_keyword = (body.get("event_keyword") or "").strip()
+    if not event_keyword:
+        raise HTTPException(400, "event_keyword is required (节气/节日关键词)")
+
+    # Credit cost — admin configurable
+    cc = load_credits_config(db).get("poster_generation", {}).get("per_generation", 5)
+    credits_needed = int(cc)
+    if current_user.credits < credits_needed:
+        raise HTTPException(402, f"积分不足，需要 {credits_needed} 积分，当前余额 {current_user.credits}")
+
+    gen = PosterGeneration(
+        user_id=current_user.id,
+        brand_name=brand_name,
+        event_keyword=event_keyword,
+        headline=(body.get("headline") or "").strip() or None,
+        subline=(body.get("subline") or "").strip() or None,
+        industry=(body.get("industry") or "").strip() or None,
+        style=body.get("style", "natural"),
+        size=body.get("size", "portrait"),
+        primary_color=(body.get("primary_color") or "").strip() or None,
+        product_image_url=(body.get("product_image_url") or "").strip() or None,
+        status="processing",
+        credits_charged=credits_needed,
+    )
+    db.add(gen)
+    db.commit()
+    db.refresh(gen)
+
+    # Deduct credits
+    current_user.credits -= credits_needed
+    db.add(CreditTransaction(
+        user_id=current_user.id,
+        amount=-credits_needed,
+        reason=f"Poster生成: {brand_name} · {event_keyword}",
+    ))
+    db.commit()
+
+    # Launch background task
+    import threading
+    thread = threading.Thread(
+        target=_run_poster_generation,
+        args=(gen.id,),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"generation_id": gen.id}
+
+
+def _run_poster_generation(generation_id: int):
+    """Background thread runner for poster pipeline."""
+    import asyncio
+    from database import SessionLocal
+    from services.poster_service import generate_poster_full
+
+    db = SessionLocal()
+    try:
+        gen = db.query(PosterGeneration).filter(PosterGeneration.id == generation_id).first()
+        if not gen:
+            return
+        asyncio.run(generate_poster_full(
+            db=db,
+            gen_id=gen.id,
+            brand_name=gen.brand_name,
+            event_keyword=gen.event_keyword or "",
+            headline=gen.headline,
+            subline=gen.subline,
+            industry=gen.industry,
+            style=gen.style or "natural",
+            size_key=gen.size or "portrait",
+            primary_color=gen.primary_color,
+            product_description=None,
+            variant_count=1,
+            user_id=gen.user_id,
+        ))
+    except Exception as e:                                            # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        try:
+            gen = db.query(PosterGeneration).filter(PosterGeneration.id == generation_id).first()
+            if gen:
+                gen.status = "failed"
+                gen.error_msg = str(e)[:500]
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+@app.get("/api/poster/progress/{generation_id}", tags=["poster"])
+async def poster_progress(
+    generation_id: int,
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """SSE endpoint — polls PosterGeneration row every 3s until done."""
+    from jose import jwt, JWTError
+    from auth import SECRET_KEY, ALGORITHM
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(401, "Unauthorized")
+    except JWTError:
+        raise HTTPException(401, "Invalid token")
+
+    gen = db.query(PosterGeneration).filter(PosterGeneration.id == generation_id).first()
+    if not gen:
+        raise HTTPException(404, "Generation not found")
+    if gen.user_id != user.id:
+        raise HTTPException(403, "Not authorized")
+
+    async def event_stream():
+        import asyncio
+        from database import SessionLocal
+        for attempt in range(120):  # 10 minutes max
+            s = SessionLocal()
+            try:
+                g = s.query(PosterGeneration).filter(PosterGeneration.id == generation_id).first()
+                if not g:
+                    yield {"data": json.dumps({"type": "error", "message": "Generation disappeared"})}
+                    return
+                if g.status == "done":
+                    yield {"data": json.dumps({
+                        "type": "done",
+                        "variants": g.variants or [],
+                        "provider": g.provider,
+                    })}
+                    return
+                if g.status == "failed":
+                    yield {"data": json.dumps({"type": "error", "message": g.error_msg or "Unknown"})}
+                    return
+                # Progress approximation — provider may take 30-120s
+                pct = min(95, 15 + attempt * 5)
+                yield {"data": json.dumps({"type": "progress", "percent": pct,
+                                            "label": "生成海报背景..."})}
+            finally:
+                s.close()
+            await asyncio.sleep(3)
+        yield {"data": json.dumps({"type": "error", "message": "Generation timeout"})}
+
+    return EventSourceResponse(event_stream())
+
+
+@app.get("/api/poster/download/{generation_id}", tags=["poster"])
+def download_poster(
+    generation_id: int,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    """Download the composed poster PNG. JWT via header OR ?token=."""
+    from jose import jwt, JWTError
+    from auth import SECRET_KEY, ALGORITHM
+
+    jwt_token = token
+    if not jwt_token and request is not None:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            jwt_token = auth_header[7:]
+    if not jwt_token:
+        raise HTTPException(401, "未提供身份凭证")
+    try:
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        current_user = db.query(User).filter(User.username == username).first()
+        if not current_user or not current_user.is_active:
+            raise HTTPException(401, "身份验证失败")
+    except JWTError:
+        raise HTTPException(401, "身份验证失败")
+
+    gen = db.query(PosterGeneration).filter(
+        PosterGeneration.id == generation_id,
+        PosterGeneration.user_id == current_user.id,
+    ).first()
+    if not gen:
+        raise HTTPException(404, "Poster generation not found")
+    if gen.status != "done" or not gen.png_path:
+        raise HTTPException(400, "Poster generation not completed")
+    if not os.path.exists(gen.png_path):
+        raise HTTPException(404, "文件已被清理")
+    return FileResponse(
+        path=gen.png_path,
+        filename=os.path.basename(gen.png_path),
+        media_type="image/png",
+    )
+
+
+@app.get("/api/poster/file/{fname}", tags=["poster"])
+def fetch_poster_file(
+    fname: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve a poster image file by filename (used inline by the frontend preview)."""
+    # Safety: deny traversal
+    if "/" in fname or ".." in fname:
+        raise HTTPException(400, "invalid filename")
+    fpath = os.path.join(UPLOAD_DIR, fname)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "not found")
+    # Verify the file belongs to this user via the poster_generations table
+    gen = db.query(PosterGeneration).filter(
+        PosterGeneration.user_id == current_user.id,
+        PosterGeneration.png_path.like(f"%/{fname}"),
+    ).first()
+    if not gen:
+        raise HTTPException(403, "not authorized")
+    return FileResponse(path=fpath, filename=fname, media_type="image/png")
+
+
+@app.get("/api/poster/history", tags=["poster"])
+def poster_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+):
+    q = db.query(PosterGeneration).filter(PosterGeneration.user_id == current_user.id)
+    total = q.count()
+    items = (
+        q.order_by(PosterGeneration.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": g.id,
+                "brand_name": g.brand_name,
+                "event_keyword": g.event_keyword,
+                "style": g.style,
+                "size": g.size,
+                "status": g.status,
+                "provider": g.provider,
+                "variants": g.variants,
+                "has_png": bool(g.png_path),
+                "error_msg": g.error_msg,
                 "created_at": g.created_at.isoformat() if g.created_at else None,
             }
             for g in items

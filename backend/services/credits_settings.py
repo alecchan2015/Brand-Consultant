@@ -30,6 +30,8 @@ DEFAULTS: Dict[str, Any] = {
         "logo_png": 3,
         "logo_psd": 10,
         "logo_zip": 15,
+        # Poster generation outputs
+        "poster_png": 5,
     },
     "task_generation": {
         # Currently tasks are free to create (only downloads cost credits);
@@ -39,6 +41,10 @@ DEFAULTS: Dict[str, Any] = {
     "logo_generation": {
         # Upfront cost deducted when a logo generation job is started.
         "per_generation": 3,
+    },
+    "poster_generation": {
+        # Upfront cost for standalone poster generation
+        "per_generation": 5,
     },
 }
 
