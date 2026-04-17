@@ -300,8 +300,10 @@ async function runTest(name) {
   ElMessage.info('海报生成测试中，请耐心等待（最长 5 分钟）...')
   try {
     const res = await adminAPI.testPosterProvider(name)
-    if (res.ok) {
-      ElMessage.success(`${name} 连通正常`)
+    // Backend returns { success, provider, variants, error }
+    if (res.success) {
+      const n = (res.variants || []).length
+      ElMessage.success(`${name} 连通正常，已生成 ${n} 张测试海报`)
     } else {
       ElMessage.error(`${name} 测试失败: ${res.error || '未知错误'}`)
     }
