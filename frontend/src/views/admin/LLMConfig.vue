@@ -112,13 +112,97 @@ const agentLabel = { all: '全部', strategy: '战略规划', brand: '品牌设�
 const agentTagType = { all: 'info', strategy: 'primary', brand: 'success', operations: 'warning', image_gen: 'danger' }
 
 const modelOptions = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'dall-e-3', 'dall-e-2'],
-  anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
-  volcano: [
-    'doubao-pro-32k', 'doubao-lite-32k', 'doubao-pro-4k',
-    'doubao-seedream-3-0-t2i-250415', 'doubao-vision-pro-32k',
+  openai: [
+    // GPT-5 家族（最新）
+    'gpt-5',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-5-chat-latest',
+    // GPT-4.1
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    // GPT-4o / o 系列
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4o-2024-11-20',
+    'chatgpt-4o-latest',
+    'o3',
+    'o3-mini',
+    'o4-mini',
+    'o1',
+    'o1-mini',
+    // GPT-4 经典
+    'gpt-4-turbo',
+    'gpt-4-turbo-2024-04-09',
+    'gpt-4',
+    'gpt-4-32k',
+    // GPT-3.5
+    'gpt-3.5-turbo',
+    'gpt-3.5-turbo-16k',
+    'gpt-3.5-turbo-instruct',
+    // Image models
+    'gpt-image-1',
+    'dall-e-3',
+    'dall-e-2',
   ],
-  stability: ['stable-diffusion-xl-1024-v1-0', 'stable-diffusion-v1-6'],
+  anthropic: [
+    // Claude 4.7 系列（最新）
+    'claude-opus-4-7',
+    'claude-opus-4-7-20260101',
+    'claude-sonnet-4-7',
+    'claude-sonnet-4-7-1m',                // 1M context window
+    // Claude 4.6
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-6-20251015',
+    // Claude 4.5
+    'claude-opus-4-5',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-haiku-4-5-20251001',
+    // Claude 3.7 / 3.5 / 3
+    'claude-3-7-sonnet-latest',
+    'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet-latest',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-latest',
+    'claude-3-5-haiku-20241022',
+    'claude-3-opus-latest',
+    'claude-3-opus-20240229',
+    'claude-3-sonnet-20240229',
+    'claude-3-haiku-20240307',
+  ],
+  volcano: [
+    // 豆包 1.5 / Pro 系列
+    'doubao-1-5-pro-32k',
+    'doubao-1-5-pro-256k',
+    'doubao-1-5-lite-32k',
+    'doubao-pro-32k',
+    'doubao-pro-128k',
+    'doubao-pro-256k',
+    'doubao-lite-32k',
+    'doubao-lite-128k',
+    'doubao-pro-4k',
+    // Vision / Image
+    'doubao-vision-pro-32k',
+    'doubao-vision-lite-32k',
+    'doubao-seedream-3-0-t2i-250415',
+    'doubao-seedream-3-0-t2i',
+    // 即梦
+    'jimeng-3.0',
+    'jimeng-2.1',
+  ],
+  stability: [
+    'stable-image-ultra',
+    'stable-image-core',
+    'stable-diffusion-3-5-large',
+    'stable-diffusion-3-5-large-turbo',
+    'stable-diffusion-3-5-medium',
+    'stable-diffusion-3-medium',
+    'stable-diffusion-xl-1024-v1-0',
+    'stable-diffusion-v1-6',
+  ],
 }
 
 const baseUrlPlaceholder = {
