@@ -21,9 +21,29 @@ api.interceptors.response.use(
 
 // Auth
 export const authAPI = {
-  login: (data) => api.post('/auth/login', data),
+  // Username + password (legacy / backup)
+  login:    (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
-  me: () => api.get('/auth/me'),
+  me:       () => api.get('/auth/me'),
+  updateMyProfile: (data) => api.put('/auth/me/profile', data),
+
+  // Public config — which tabs to show
+  getPublicConfig: () => api.get('/auth/config/public'),
+
+  // OTP delivery (used before email/phone register or login)
+  sendOtp: (data) => api.post('/auth/otp/send', data),
+
+  // Email OTP flow
+  registerEmail:  (data) => api.post('/auth/register/email', data),
+  loginEmailOtp:  (data) => api.post('/auth/login/email-otp', data),
+
+  // Phone SMS flow
+  registerPhone:  (data) => api.post('/auth/register/phone', data),
+  loginPhoneOtp:  (data) => api.post('/auth/login/phone-otp', data),
+
+  // Google OAuth
+  googleAuthUrl:  () => api.get('/auth/google/url'),
+  googleCallback: (data) => api.post('/auth/google/callback', data),
 }
 
 // Tasks
@@ -88,6 +108,25 @@ export const adminAPI = {
     { provider },
     { timeout: 120000 },
   ),
+
+  // ─── Auth / Registration policy (admin) ───
+  getAuthConfig:      () => api.get('/admin/auth/config'),
+  saveAuthConfig:     (data) => api.put('/admin/auth/config', data),
+  getSmsProvider:     () => api.get('/admin/auth/sms-provider'),
+  saveSmsProvider:    (data) => api.put('/admin/auth/sms-provider', data),
+  testSmsProvider:    (target) => api.post('/admin/auth/sms-provider/test', { target }, { timeout: 30000 }),
+  getEmailProvider:   () => api.get('/admin/auth/email-provider'),
+  saveEmailProvider:  (data) => api.put('/admin/auth/email-provider', data),
+  testEmailProvider:  (target) => api.post('/admin/auth/email-provider/test', { target }, { timeout: 60000 }),
+  getGoogleOAuth:     () => api.get('/admin/auth/google-oauth'),
+  saveGoogleOAuth:    (data) => api.put('/admin/auth/google-oauth', data),
+
+  // User approval
+  getPendingUsers:    () => api.get('/admin/users/pending'),
+  approveUser:        (id) => api.post(`/admin/users/${id}/approve`),
+  rejectUser:         (id) => api.post(`/admin/users/${id}/reject`),
+  getUserDetail:      (id) => api.get(`/admin/users/${id}`),
+  updateUserProfile:  (id, data) => api.put(`/admin/users/${id}/profile`, data),
 }
 
 // Logo

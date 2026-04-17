@@ -205,68 +205,21 @@
     </footer>
 
     <!-- Login Dialog -->
+    <!-- Unified Auth Modal (login + register via AuthTabs) -->
     <teleport to="body">
       <transition name="modal">
-        <div v-if="showLoginDialog" class="modal-overlay" @click.self="showLoginDialog = false">
-          <div class="modal-card">
-            <button class="modal-close" @click="showLoginDialog = false">&times;</button>
+        <div v-if="showLoginDialog || showRegisterDialog" class="modal-overlay" @click.self="closeAuthModals">
+          <div class="modal-card auth-modal-card">
+            <button class="modal-close" @click="closeAuthModals">&times;</button>
             <div class="modal-header">
               <span class="nav-logo modal-logo">YBC</span>
-              <h2>登录账户</h2>
-              <p>登录后即可开始 AI 品牌咨询</p>
+              <h2>{{ showRegisterDialog ? '创建账户' : '欢迎回来' }}</h2>
+              <p>AI 品牌战略咨询平台</p>
             </div>
-            <form @submit.prevent="handleLogin" class="modal-form">
-              <div class="form-group">
-                <label>用户名</label>
-                <input v-model="loginForm.username" placeholder="请输入用户名" autocomplete="username" />
-              </div>
-              <div class="form-group">
-                <label>密码</label>
-                <input v-model="loginForm.password" type="password" placeholder="请输入密码" autocomplete="current-password" @keyup.enter="handleLogin" />
-              </div>
-              <button type="submit" class="btn-modal-submit" :disabled="loginLoading">
-                {{ loginLoading ? '登录中...' : '登 录' }}
-              </button>
-            </form>
-            <div class="modal-footer">
-              还没有账户？<a @click="showLoginDialog = false; showRegisterDialog = true">免费注册</a>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </teleport>
-
-    <!-- Register Dialog -->
-    <teleport to="body">
-      <transition name="modal">
-        <div v-if="showRegisterDialog" class="modal-overlay" @click.self="showRegisterDialog = false">
-          <div class="modal-card">
-            <button class="modal-close" @click="showRegisterDialog = false">&times;</button>
-            <div class="modal-header">
-              <span class="nav-logo modal-logo">YBC</span>
-              <h2>创建账户</h2>
-              <p>注册即可免费体验 AI 品牌咨询</p>
-            </div>
-            <form @submit.prevent="handleRegister" class="modal-form">
-              <div class="form-group">
-                <label>用户名</label>
-                <input v-model="regForm.username" placeholder="3-20位字母数字" autocomplete="username" />
-              </div>
-              <div class="form-group">
-                <label>邮箱</label>
-                <input v-model="regForm.email" type="email" placeholder="your@email.com" autocomplete="email" />
-              </div>
-              <div class="form-group">
-                <label>密码</label>
-                <input v-model="regForm.password" type="password" placeholder="至少6位" autocomplete="new-password" />
-              </div>
-              <button type="submit" class="btn-modal-submit" :disabled="regLoading">
-                {{ regLoading ? '注册中...' : '免费注册' }}
-              </button>
-            </form>
-            <div class="modal-footer">
-              已有账户？<a @click="showRegisterDialog = false; showLoginDialog = true">去登录</a>
-            </div>
+            <AuthTabs
+              :initial-mode="showRegisterDialog ? 'register' : 'login'"
+              @success="onAuthSuccess"
+            />
           </div>
         </div>
       </transition>
@@ -279,6 +232,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../store'
 import { authAPI, tasksAPI, agentsAPI } from '../api'
+import AuthTabs from '../components/AuthTabs.vue'
 
 const router = useRouter()
 const store = useUserStore()
@@ -328,45 +282,21 @@ function toggleSelectAll() {
   else form.value.agents_selected = agents.value.map(a => a.type)
 }
 
-// Auth dialogs
+// Auth dialogs — unified AuthTabs modal
 const showLoginDialog = ref(false)
 const showRegisterDialog = ref(false)
-const loginForm = ref({ username: '', password: '' })
-const regForm = ref({ username: '', email: '', password: '' })
-const loginLoading = ref(false)
-const regLoading = ref(false)
 
-async function handleLogin() {
-  if (!loginForm.value.username || !loginForm.value.password) return
-  loginLoading.value = true
-  try {
-    await store.login(loginForm.value.username, loginForm.value.password)
-    showLoginDialog.value = false
-    // If there was a pending submit, do it now
-    if (pendingSubmit.value) {
-      pendingSubmit.value = false
-      await doSubmitTask()
-    }
-  } catch (e) {
-    alert(e.message || '登录失败')
-  } finally {
-    loginLoading.value = false
-  }
+function closeAuthModals() {
+  showLoginDialog.value = false
+  showRegisterDialog.value = false
 }
 
-async function handleRegister() {
-  if (!regForm.value.username || !regForm.value.email || !regForm.value.password) return
-  regLoading.value = true
-  try {
-    await authAPI.register(regForm.value)
-    showRegisterDialog.value = false
-    showLoginDialog.value = true
-    loginForm.value.username = regForm.value.username
-    alert('注册成功，请登录')
-  } catch (e) {
-    alert(e.message || '注册失败')
-  } finally {
-    regLoading.value = false
+async function onAuthSuccess(user) {
+  closeAuthModals()
+  // If a task submit was pending before login, continue it
+  if (pendingSubmit.value) {
+    pendingSubmit.value = false
+    await doSubmitTask()
   }
 }
 

@@ -21,6 +21,9 @@
         <el-menu-item index="/admin/users">
           <el-icon><User /></el-icon><span>用户管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/auth">
+          <el-icon><Lock /></el-icon><span>注册策略</span>
+        </el-menu-item>
         <el-menu-item index="/admin/tasks">
           <el-icon><List /></el-icon><span>任务记录</span>
         </el-menu-item>

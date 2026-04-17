@@ -22,9 +22,26 @@ class UserOut(BaseModel):
     credits: int
     is_active: bool
     created_at: datetime
+    # Extended multi-channel fields (all optional for backward compat)
+    phone: Optional[str] = None
+    auth_provider: Optional[str] = "local"
+    pending_approval: Optional[bool] = False
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    position: Optional[str] = None
+    company_size: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class UserProfilePatch(BaseModel):
+    """User-editable profile fields (self-service or admin-editable)."""
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    position: Optional[str] = None
+    company_size: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -119,3 +136,97 @@ class UserCreditsUpdate(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+
+# ─── Multi-channel auth schemas ────────────────────────────────────────────
+class OtpSendReq(BaseModel):
+    channel: str                         # "email" | "phone"
+    target: str                          # email address or phone number
+    purpose: Optional[str] = "register"  # register | login | reset_password
+
+
+class EmailRegisterReq(BaseModel):
+    email: EmailStr
+    otp: str
+    password: Optional[str] = None       # optional; email-OTP accounts can skip
+    username: Optional[str] = None
+    profile: Optional[UserProfilePatch] = None
+
+
+class EmailOtpLoginReq(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+class PhoneRegisterReq(BaseModel):
+    phone: str
+    otp: str
+    password: Optional[str] = None
+    username: Optional[str] = None
+    profile: Optional[UserProfilePatch] = None
+
+
+class PhoneOtpLoginReq(BaseModel):
+    phone: str
+    otp: str
+
+
+class GoogleCallbackReq(BaseModel):
+    code: str
+    state: str
+    profile: Optional[UserProfilePatch] = None
+
+
+class AuthPublicConfig(BaseModel):
+    methods: dict
+    approval_required: bool
+
+
+class AuthRegistrationConfigPatch(BaseModel):
+    """All admin-editable registration policy. Partial updates supported."""
+    methods: Optional[dict] = None
+    approval_required: Optional[bool] = None
+    email_whitelist_domains: Optional[List[str]] = None
+    email_blacklist_domains: Optional[List[str]] = None
+    credits_by_channel: Optional[dict] = None
+    rate_limit: Optional[dict] = None
+
+
+class SmsProviderPatch(BaseModel):
+    provider: Optional[str] = "tencent"
+    secret_id: Optional[str] = None
+    secret_key: Optional[str] = None
+    region: Optional[str] = None
+    sdk_app_id: Optional[str] = None
+    sign_name: Optional[str] = None
+    template_id: Optional[str] = None
+
+
+class EmailProviderPatch(BaseModel):
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    from_name: Optional[str] = None
+    from_email: Optional[str] = None
+    use_ssl: Optional[bool] = None
+
+
+class GoogleOAuthPatch(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    redirect_uri: Optional[str] = None
+
+
+class ProviderTestReq(BaseModel):
+    """Target to send a test OTP/SMS to (admin config verification)."""
+    target: str
+
+
+class RegistrationResponse(BaseModel):
+    """Returned after successful registration. token may be absent if awaiting approval."""
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+    user: Optional[UserOut] = None
+    pending_approval: bool = False
+    message: Optional[str] = None

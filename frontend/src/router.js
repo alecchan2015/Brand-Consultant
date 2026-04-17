@@ -5,6 +5,7 @@ const routes = [
   { path: '/', component: () => import('./views/Home.vue'), meta: {} },
   { path: '/login', component: () => import('./views/Login.vue'), meta: { guest: true } },
   { path: '/register', component: () => import('./views/Register.vue'), meta: { guest: true } },
+  { path: '/auth/callback', component: () => import('./views/AuthCallback.vue'), meta: {} },
   {
     path: '/app',
     component: () => import('./views/Layout.vue'),
@@ -28,6 +29,7 @@ const routes = [
       { path: 'ppt-provider', component: () => import('./views/admin/PPTProvider.vue') },
       { path: 'knowledge', component: () => import('./views/admin/Knowledge.vue') },
       { path: 'users', component: () => import('./views/admin/Users.vue') },
+      { path: 'auth', component: () => import('./views/admin/Auth.vue') },
       { path: 'tasks', component: () => import('./views/admin/Tasks.vue') },
       { path: 'token-usage', component: () => import('./views/admin/TokenUsage.vue') },
       { path: 'logo-provider', component: () => import('./views/admin/LogoProvider.vue') },

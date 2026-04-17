@@ -9,14 +9,52 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # nullable for OAuth-only users
     role = Column(String(20), default="user")  # "user" or "admin"
     credits = Column(Integer, default=100)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Multi-channel auth fields
+    phone = Column(String(20), unique=True, nullable=True, index=True)
+    auth_provider = Column(String(30), default="local")  # local | email_otp | phone_sms | google
+    google_id = Column(String(100), unique=True, nullable=True)
+    google_email = Column(String(200), nullable=True)
+
+    # Enterprise / profile fields
+    company_name = Column(String(200), nullable=True)
+    industry = Column(String(100), nullable=True)
+    position = Column(String(100), nullable=True)
+    company_size = Column(String(50), nullable=True)  # 1-10 | 11-50 | 51-200 | 201-1000 | 1000+
+
+    # Registration approval workflow
+    pending_approval = Column(Boolean, default=False)
+
     tasks = relationship("Task", back_populates="user")
     credit_transactions = relationship("CreditTransaction", back_populates="user")
+
+
+class OtpCode(Base):
+    """One-time password codes for email / phone verification."""
+    __tablename__ = "otp_codes"
+    id = Column(Integer, primary_key=True)
+    channel = Column(String(10), nullable=False)   # "email" | "phone"
+    target = Column(String(200), nullable=False, index=True)
+    code = Column(String(10), nullable=False)
+    purpose = Column(String(20), default="register")  # register | login | reset_password
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    ip = Column(String(45), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthRateLimit(Base):
+    """Sliding-window rate limit buckets for auth-sensitive endpoints."""
+    __tablename__ = "auth_rate_limits"
+    id = Column(Integer, primary_key=True)
+    bucket = Column(String(150), nullable=False, index=True)  # e.g. "otp:email:xxx@x.com"
+    window_start = Column(DateTime, nullable=False)
+    count = Column(Integer, default=0)
 
 
 class LLMConfig(Base):

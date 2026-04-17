@@ -24,7 +24,12 @@ from schemas import (
     LLMConfigCreate, LLMConfigOut,
     KnowledgeCreate, KnowledgeOut,
     TaskCreate, TaskOut, TaskResultOut,
-    UserCreditsUpdate, UserStatusUpdate,
+    UserCreditsUpdate, UserStatusUpdate, UserProfilePatch,
+    OtpSendReq, EmailRegisterReq, EmailOtpLoginReq,
+    PhoneRegisterReq, PhoneOtpLoginReq, GoogleCallbackReq,
+    AuthPublicConfig, AuthRegistrationConfigPatch,
+    SmsProviderPatch, EmailProviderPatch, GoogleOAuthPatch,
+    ProviderTestReq, RegistrationResponse,
 )
 from services.agent_service import run_multi_agent, AGENT_META
 from services.file_service import (
@@ -57,6 +62,25 @@ async def lifespan(app: FastAPI):
             for col, dtype in migrations.items():
                 if col not in existing_cols:
                     conn.execute(text(f"ALTER TABLE agent_knowledge ADD COLUMN {col} {dtype}"))
+            conn.commit()
+
+        # Multi-channel auth migration on existing users table
+        if "users" in inspector.get_table_names():
+            user_cols = {c["name"] for c in inspector.get_columns("users")}
+            user_migrations = {
+                "phone":             "VARCHAR(20)",
+                "auth_provider":     "VARCHAR(30) DEFAULT 'local'",
+                "google_id":         "VARCHAR(100)",
+                "google_email":      "VARCHAR(200)",
+                "company_name":      "VARCHAR(200)",
+                "industry":          "VARCHAR(100)",
+                "position":          "VARCHAR(100)",
+                "company_size":      "VARCHAR(50)",
+                "pending_approval":  "BOOLEAN DEFAULT 0",
+            }
+            for col, dtype in user_migrations.items():
+                if col not in user_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {dtype}"))
             conn.commit()
 
     # Seed default admin (update existing or create new)
@@ -104,28 +128,57 @@ app.add_middleware(
 # Auth Routes
 # ─────────────────────────────────────────────
 
-@app.post("/api/auth/register", response_model=UserOut, tags=["auth"])
-def register(body: UserRegister, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == body.username).first():
-        raise HTTPException(400, "用户名已存在")
-    if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(400, "邮箱已被注册")
-    user = User(
+def _client_ip(request: Request) -> str:
+    """Extract client IP, respecting X-Forwarded-For when present."""
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _finalize_registration(user: User, approval_required: bool):
+    """Build the RegistrationResponse — omit token when awaiting approval."""
+    if approval_required:
+        return {
+            "pending_approval": True,
+            "message": "注册成功，等待管理员审核后方可登录",
+            "user": user,
+        }
+    token = create_access_token({"sub": user.username})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user,
+        "pending_approval": False,
+    }
+
+
+@app.post("/api/auth/register", response_model=RegistrationResponse, tags=["auth"])
+def register(
+    body: UserRegister,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Username + password registration (backward-compatible)."""
+    from services.registration_service import create_user
+    user, approval_required = create_user(
+        db,
+        "username_password",
         username=body.username,
         email=body.email,
         password_hash=get_password_hash(body.password),
+        ip=_client_ip(request),
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    return _finalize_registration(user, approval_required)
 
 
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["auth"])
 def login(body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "用户名或密码错误")
+    if user.pending_approval:
+        raise HTTPException(403, "账号等待管理员审核")
     if not user.is_active:
         raise HTTPException(403, "账号已被禁用")
     token = create_access_token({"sub": user.username})
@@ -135,6 +188,257 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
 @app.get("/api/auth/me", response_model=UserOut, tags=["auth"])
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@app.put("/api/auth/me/profile", response_model=UserOut, tags=["auth"])
+def update_my_profile(
+    body: UserProfilePatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Let users self-edit enterprise info + phone."""
+    for field in ("company_name", "industry", "position", "company_size"):
+        val = getattr(body, field, None)
+        if val is not None:
+            setattr(current_user, field, val)
+    if body.phone is not None and body.phone != current_user.phone:
+        # Uniqueness check
+        if body.phone:
+            existing = db.query(User).filter(User.phone == body.phone, User.id != current_user.id).first()
+            if existing:
+                raise HTTPException(409, "该手机号已绑定其他账号")
+        current_user.phone = body.phone or None
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+# ─────────────────────────────────────────────
+# Multi-channel auth: OTP send + channel-specific register/login
+# ─────────────────────────────────────────────
+
+@app.get("/api/auth/config/public", response_model=AuthPublicConfig, tags=["auth"])
+def public_auth_config(db: Session = Depends(get_db)):
+    """Which registration methods are currently enabled (for frontend tabs)."""
+    from services.auth_settings import public_config
+    return public_config(db)
+
+
+@app.post("/api/auth/otp/send", tags=["auth"])
+async def send_otp(
+    body: OtpSendReq,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Issue and deliver a 6-digit OTP to the given email/phone."""
+    from services import otp_service, rate_limit_service
+    from services.auth_settings import load_registration_config
+
+    channel = body.channel.lower()
+    if channel not in ("email", "phone"):
+        raise HTTPException(400, "channel 必须是 email 或 phone")
+    target = body.target.strip()
+    if not target:
+        raise HTTPException(400, "target 不能为空")
+
+    # Method must be enabled
+    cfg = load_registration_config(db)
+    method_key = "email_otp" if channel == "email" else "phone_sms"
+    if not cfg.get("methods", {}).get(method_key, False):
+        raise HTTPException(403, "该注册/登录方式当前已关闭")
+
+    rate = cfg.get("rate_limit", {})
+    cooldown = int(rate.get("otp_cooldown_seconds", 60))
+    hourly = int(rate.get("otp_per_target_per_hour", 5))
+
+    # 1) Cooldown (per-target, 1 code per 60s by default)
+    if not rate_limit_service.check_and_increment(
+        db, f"otp_cooldown:{channel}:{target}", window_seconds=cooldown, limit=1,
+    ):
+        raise HTTPException(429, f"请等待 {cooldown} 秒后再重新获取验证码")
+
+    # 2) Hourly limit per target
+    if not rate_limit_service.check_and_increment(
+        db, f"otp:{channel}:{target}", window_seconds=3600, limit=hourly,
+    ):
+        raise HTTPException(429, "验证码发送频率过高，请 1 小时后再试")
+
+    # 3) Generate and deliver
+    ip = _client_ip(request)
+    code = otp_service.create_otp(db, channel, target, purpose=body.purpose or "register", ip=ip)
+
+    try:
+        if channel == "email":
+            from services.email_service import send_otp_email
+            await send_otp_email(db, target, code)
+        else:
+            from services.sms_service import send_otp_sms
+            await send_otp_sms(db, target, code)
+    except Exception as exc:                                            # noqa: BLE001
+        raise HTTPException(500, f"验证码发送失败: {exc}")
+
+    return {"ok": True, "message": f"验证码已发送至 {target}"}
+
+
+@app.post("/api/auth/register/email", response_model=RegistrationResponse, tags=["auth"])
+def register_email(
+    body: EmailRegisterReq,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    from services import otp_service
+    from services.registration_service import create_user
+
+    if not otp_service.verify_otp(db, "email", body.email, body.otp, purpose="register"):
+        raise HTTPException(400, "验证码无效或已过期")
+
+    pwd_hash = get_password_hash(body.password) if body.password else None
+    user, approval_required = create_user(
+        db,
+        "email_otp",
+        username=body.username,
+        email=body.email,
+        password_hash=pwd_hash,
+        profile=body.profile.dict() if body.profile else None,
+        ip=_client_ip(request),
+    )
+    return _finalize_registration(user, approval_required)
+
+
+@app.post("/api/auth/login/email-otp", response_model=TokenResponse, tags=["auth"])
+def login_email_otp(body: EmailOtpLoginReq, db: Session = Depends(get_db)):
+    from services import otp_service
+    user = db.query(User).filter(User.email == body.email).first()
+    if not user:
+        raise HTTPException(404, "账号不存在，请先注册")
+    if not otp_service.verify_otp(db, "email", body.email, body.otp, purpose="login"):
+        # Also accept a register-purpose OTP if user typed wrong tab
+        if not otp_service.verify_otp(db, "email", body.email, body.otp, purpose="register"):
+            raise HTTPException(400, "验证码无效或已过期")
+    if user.pending_approval:
+        raise HTTPException(403, "账号等待管理员审核")
+    if not user.is_active:
+        raise HTTPException(403, "账号已被禁用")
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.post("/api/auth/register/phone", response_model=RegistrationResponse, tags=["auth"])
+def register_phone(
+    body: PhoneRegisterReq,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    from services import otp_service
+    from services.registration_service import create_user
+
+    if not otp_service.verify_otp(db, "phone", body.phone, body.otp, purpose="register"):
+        raise HTTPException(400, "验证码无效或已过期")
+
+    pwd_hash = get_password_hash(body.password) if body.password else None
+    user, approval_required = create_user(
+        db,
+        "phone_sms",
+        username=body.username,
+        phone=body.phone,
+        password_hash=pwd_hash,
+        profile=body.profile.dict() if body.profile else None,
+        ip=_client_ip(request),
+    )
+    return _finalize_registration(user, approval_required)
+
+
+@app.post("/api/auth/login/phone-otp", response_model=TokenResponse, tags=["auth"])
+def login_phone_otp(body: PhoneOtpLoginReq, db: Session = Depends(get_db)):
+    from services import otp_service
+    user = db.query(User).filter(User.phone == body.phone).first()
+    if not user:
+        raise HTTPException(404, "账号不存在，请先注册")
+    if not otp_service.verify_otp(db, "phone", body.phone, body.otp, purpose="login"):
+        if not otp_service.verify_otp(db, "phone", body.phone, body.otp, purpose="register"):
+            raise HTTPException(400, "验证码无效或已过期")
+    if user.pending_approval:
+        raise HTTPException(403, "账号等待管理员审核")
+    if not user.is_active:
+        raise HTTPException(403, "账号已被禁用")
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.get("/api/auth/google/url", tags=["auth"])
+def google_auth_url(db: Session = Depends(get_db)):
+    from services.oauth_google import generate_auth_url
+    try:
+        url, state = generate_auth_url(db)
+    except Exception as exc:                                            # noqa: BLE001
+        raise HTTPException(400, str(exc))
+    return {"url": url, "state": state}
+
+
+@app.post("/api/auth/google/callback", response_model=RegistrationResponse, tags=["auth"])
+async def google_callback(
+    body: GoogleCallbackReq,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    from services import oauth_google
+    from services.registration_service import create_user
+
+    if not oauth_google.consume_state(body.state):
+        raise HTTPException(400, "无效或已过期的 state")
+
+    try:
+        token_data = await oauth_google.exchange_code_for_token(db, body.code)
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise HTTPException(400, "Google 未返回 access_token")
+        info = await oauth_google.fetch_userinfo(access_token)
+    except Exception as exc:                                            # noqa: BLE001
+        raise HTTPException(400, f"Google 认证失败: {exc}")
+
+    google_id = info.get("sub")
+    google_email = info.get("email", "")
+    if not google_id:
+        raise HTTPException(400, "Google 用户信息不完整")
+
+    # Match existing user: by google_id → by email → else create
+    user = db.query(User).filter(User.google_id == google_id).first()
+    if not user and google_email:
+        user = db.query(User).filter(User.email == google_email).first()
+        if user:
+            # Link google_id onto existing account
+            user.google_id = google_id
+            user.google_email = google_email
+            db.commit()
+
+    approval_required = False
+    if not user:
+        user, approval_required = create_user(
+            db,
+            "google_oauth",
+            email=google_email or f"google_{google_id}@placeholder.local",
+            google_id=google_id,
+            google_email=google_email,
+            profile=body.profile.dict() if body.profile else None,
+            ip=_client_ip(request),
+        )
+
+    if user.pending_approval:
+        return {
+            "pending_approval": True,
+            "message": "账号等待管理员审核",
+            "user": user,
+        }
+    if not user.is_active:
+        raise HTTPException(403, "账号已被禁用")
+
+    jwt_token = create_access_token({"sub": user.username})
+    return {
+        "access_token": jwt_token,
+        "token_type":   "bearer",
+        "user":         user,
+        "pending_approval": False,
+    }
 
 
 # ─────────────────────────────────────────────
@@ -1168,6 +1472,200 @@ def update_user_status(
     db.commit()
     db.refresh(user)
     return user
+
+
+# ─────────────────────────────────────────────
+# Admin: User approval + profile management
+# ─────────────────────────────────────────────
+
+@app.get("/api/admin/users/pending", response_model=List[UserOut], tags=["admin"])
+def list_pending_users(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    return (
+        db.query(User)
+        .filter(User.pending_approval == True)
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+
+@app.post("/api/admin/users/{user_id}/approve", response_model=UserOut, tags=["admin"])
+def approve_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    user.pending_approval = False
+    user.is_active = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.post("/api/admin/users/{user_id}/reject", tags=["admin"])
+def reject_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    # Soft-delete by deactivating
+    user.is_active = False
+    user.pending_approval = False
+    db.commit()
+    return {"message": "已拒绝该用户"}
+
+
+@app.get("/api/admin/users/{user_id}", response_model=UserOut, tags=["admin"])
+def get_user_detail(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    return user
+
+
+@app.put("/api/admin/users/{user_id}/profile", response_model=UserOut, tags=["admin"])
+def admin_update_user_profile(
+    user_id: int,
+    body: UserProfilePatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    for field in ("company_name", "industry", "position", "company_size"):
+        val = getattr(body, field, None)
+        if val is not None:
+            setattr(user, field, val)
+    if body.phone is not None and body.phone != user.phone:
+        if body.phone:
+            dup = db.query(User).filter(User.phone == body.phone, User.id != user_id).first()
+            if dup:
+                raise HTTPException(409, "该手机号已绑定其他账号")
+        user.phone = body.phone or None
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# ─────────────────────────────────────────────
+# Admin: Auth / registration policy + provider configs
+# ─────────────────────────────────────────────
+
+@app.get("/api/admin/auth/config", tags=["admin"])
+def admin_get_auth_config(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    from services.auth_settings import load_registration_config
+    return load_registration_config(db)
+
+
+@app.put("/api/admin/auth/config", tags=["admin"])
+def admin_update_auth_config(
+    body: AuthRegistrationConfigPatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.auth_settings import save_registration_config
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    return save_registration_config(db, patch)
+
+
+@app.get("/api/admin/auth/sms-provider", tags=["admin"])
+def admin_get_sms_provider(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    from services.auth_settings import load_sms_config, redact_sms
+    return redact_sms(load_sms_config(db))
+
+
+@app.put("/api/admin/auth/sms-provider", tags=["admin"])
+def admin_update_sms_provider(
+    body: SmsProviderPatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.auth_settings import save_sms_config, redact_sms
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Allow clearing a secret by sending empty string, but ignore redaction placeholders
+    for secret_field in ("secret_id", "secret_key"):
+        val = patch.get(secret_field)
+        if val and "..." in val:
+            patch.pop(secret_field)
+    return redact_sms(save_sms_config(db, patch))
+
+
+@app.post("/api/admin/auth/sms-provider/test", tags=["admin"])
+async def admin_test_sms_provider(
+    body: ProviderTestReq,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.sms_service import send_test_sms
+    try:
+        await send_test_sms(db, body.target)
+    except Exception as exc:                                            # noqa: BLE001
+        raise HTTPException(400, f"测试发送失败: {exc}")
+    return {"ok": True, "message": f"测试短信已发送至 {body.target}"}
+
+
+@app.get("/api/admin/auth/email-provider", tags=["admin"])
+def admin_get_email_provider(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    from services.auth_settings import load_email_config, redact_email
+    return redact_email(load_email_config(db))
+
+
+@app.put("/api/admin/auth/email-provider", tags=["admin"])
+def admin_update_email_provider(
+    body: EmailProviderPatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.auth_settings import save_email_config, redact_email
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    val = patch.get("smtp_password")
+    if val and "..." in val:
+        patch.pop("smtp_password")
+    return redact_email(save_email_config(db, patch))
+
+
+@app.post("/api/admin/auth/email-provider/test", tags=["admin"])
+async def admin_test_email_provider(
+    body: ProviderTestReq,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.email_service import send_test_email
+    try:
+        await send_test_email(db, body.target)
+    except Exception as exc:                                            # noqa: BLE001
+        raise HTTPException(400, f"测试发送失败: {exc}")
+    return {"ok": True, "message": f"测试邮件已发送至 {body.target}"}
+
+
+@app.get("/api/admin/auth/google-oauth", tags=["admin"])
+def admin_get_google_oauth(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    from services.auth_settings import load_google_config, redact_google
+    return redact_google(load_google_config(db))
+
+
+@app.put("/api/admin/auth/google-oauth", tags=["admin"])
+def admin_update_google_oauth(
+    body: GoogleOAuthPatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    from services.auth_settings import save_google_config, redact_google
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    val = patch.get("client_secret")
+    if val and "..." in val:
+        patch.pop("client_secret")
+    return redact_google(save_google_config(db, patch))
 
 
 @app.get("/api/admin/tasks", response_model=List[TaskOut], tags=["admin"])
