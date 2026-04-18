@@ -103,6 +103,7 @@ class TaskCreate(BaseModel):
     query: str
     agents_selected: List[str]
     brand_name: Optional[str] = None
+    locale: Optional[str] = "zh-CN"
 
 
 class TaskResultOut(BaseModel):

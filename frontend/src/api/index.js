@@ -180,6 +180,14 @@ export const posterAPI = {
   },
   fileUrl: (fname) => `/api${fname.startsWith('/') ? fname : '/poster/file/' + fname}`,
   history: (page = 1, page_size = 10) => api.get('/poster/history', { params: { page, page_size } }),
+  uploadProduct: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/poster/upload-product', fd, {
+      timeout: 60000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // Agents meta

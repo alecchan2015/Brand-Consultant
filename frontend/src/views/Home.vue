@@ -247,7 +247,7 @@ import { authAPI, tasksAPI, agentsAPI } from '../api'
 import AuthTabs from '../components/AuthTabs.vue'
 import LangSwitch from '../components/LangSwitch.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const router = useRouter()
 const store = useUserStore()
@@ -353,6 +353,7 @@ async function doSubmitTask() {
       query: form.value.query,
       brand_name: form.value.brand_name,
       agents_selected: form.value.agents_selected,
+      locale: locale.value,
     })
     router.push(`/tasks/${task.id}`)
   } catch (e) {

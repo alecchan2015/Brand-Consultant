@@ -66,21 +66,60 @@ def build_poster_prompt(
     industry: Optional[str] = None,
     primary_color: Optional[str] = None,
     product_description: Optional[str] = None,
+    headline: Optional[str] = None,
+    subline: Optional[str] = None,
+    has_product_image: bool = False,
 ) -> str:
-    """Compose a single-image prompt suitable for DALL-E / FLUX / 即梦."""
+    """Compose a single-image prompt — bakes slogan and atmosphere directly into
+    the AI render so the output is editorial, not template-stamped."""
     style_hint = _STYLE_HINTS.get(style, _STYLE_HINTS["natural"])
     scene_hint = _EVENT_SCENE_HINTS.get(event_keyword, "")
-    color_hint = f"Primary color theme {primary_color}. " if primary_color else ""
-    industry_hint = f"Industry: {industry}. " if industry else ""
-    product_hint  = f"Feature a {product_description} as focal product. " if product_description else ""
+    color_hint = f"Primary color accent {primary_color}. " if primary_color else ""
+    industry_hint = f"Industry context: {industry}. " if industry else ""
+    product_hint = (
+        f"Feature a {product_description} as focal product. "
+        if product_description else ""
+    )
 
-    # Portrait composition explicit — text will be added in later layer (keep clean).
+    # If user uploaded a product image we'll composite it ourselves; ask AI to
+    # leave the center-lower area clean for the product placement.
+    product_area_hint = (
+        "Keep the lower-middle third of the composition uncluttered — "
+        "reserve a clean, softly lit area for a product placement that will be "
+        "composited in post. "
+        if has_product_image else ""
+    )
+
+    # If headline/slogan provided, allow the AI to render it elegantly as part
+    # of the photograph (editorial magazine style) rather than us stamping it.
+    text_hint = ""
+    if headline:
+        if subline:
+            text_hint = (
+                f"Include elegant Chinese editorial typography that reads "
+                f"『{headline}』 as the hero line and 『{subline}』 as a smaller "
+                f"supporting line, positioned in the upper third, "
+                f"lightly integrated into the scene — soft serif / brush feel, "
+                f"NOT a watermark, NOT a sticker, look like high-end magazine cover. "
+            )
+        else:
+            text_hint = (
+                f"Include elegant Chinese editorial typography that reads "
+                f"『{headline}』, positioned in the upper third, feeling like a "
+                f"magazine cover headline — soft, refined, part of the composition. "
+            )
+
     return (
-        f"Professional Chinese commercial poster for {brand_name}, themed on 『{event_keyword}』. "
+        f"Ultra-premium commercial magazine poster for the brand {brand_name}, "
+        f"themed around 『{event_keyword}』. "
         f"{industry_hint}{product_hint}"
         f"{scene_hint}. {style_hint}. {color_hint}"
-        "Vertical 9:16 composition, elegant, magazine-cover quality, no text or watermark, "
-        "leaves the upper third empty for headline typography. Ultra-detailed, 8K, sharp focus."
+        f"{text_hint}{product_area_hint}"
+        "Vertical 9:16 editorial composition, natural lighting, film photography "
+        "aesthetic, soft depth of field, cinematic atmosphere. "
+        "Avoid: harsh overlays, sticker-like text, watermarks, flat template look. "
+        "Feel like a real Vogue-quality magazine cover with integrated typography. "
+        "Ultra-detailed, 8K, editorial grade."
     )
 
 
@@ -439,6 +478,9 @@ async def generate_via_providers(
     industry: Optional[str] = None,
     primary_color: Optional[str] = None,
     product_description: Optional[str] = None,
+    headline: Optional[str] = None,
+    subline: Optional[str] = None,
+    has_product_image: bool = False,
     db=None,
 ) -> tuple[PosterResult, str]:
     """Try primary → fallback → openai. Returns first successful result."""
@@ -449,6 +491,7 @@ async def generate_via_providers(
         brand_name=brand_name, event_keyword=event_keyword,
         style=style, industry=industry, primary_color=primary_color,
         product_description=product_description,
+        headline=headline, subline=subline, has_product_image=has_product_image,
     )
 
     primary  = cfg.get("provider") or "openai"

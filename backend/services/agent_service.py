@@ -34,7 +34,35 @@ AGENT_META = {
 }
 
 
-def build_system_prompt(agent_type: str, knowledge_items: list, query: str = "", brand_name: str = "") -> str:
+# Locale → output-language instruction suffix. The LLM should reply in the
+# user's UI language unless the query itself is clearly in a different
+# language (in which case "match user" wins over "match UI").
+_LOCALE_INSTRUCTIONS = {
+    "zh-CN": (
+        "\n\n# 语言要求\n"
+        "请以**简体中文**回复。如果用户输入的问题是其他语言，则优先匹配用户的输入语言。"
+    ),
+    "en": (
+        "\n\n# Language Requirements\n"
+        "Respond in **English**. If the user's query is clearly in another language, "
+        "match the user's input language instead. Use professional SaaS / brand-strategy "
+        "tone — concise, assertive, substance over decoration."
+    ),
+    "ja": (
+        "\n\n# 言語要件\n"
+        "**日本語（丁寧語）**で回答してください。ユーザーの入力が明らかに他の言語である場合は、"
+        "ユーザーの入力言語に合わせて回答してください。"
+    ),
+}
+
+
+def build_system_prompt(
+    agent_type: str,
+    knowledge_items: list,
+    query: str = "",
+    brand_name: str = "",
+    locale: str = "zh-CN",
+) -> str:
     base_prompt = AGENT_META[agent_type]["system_prompt"]
 
     # Build knowledge context from retrieved items
@@ -50,6 +78,9 @@ def build_system_prompt(agent_type: str, knowledge_items: list, query: str = "",
     prompt = prompt.replace("{task_description}", query or "")
     prompt = prompt.replace("{brand_context}", brand_name or "（待定）")
 
+    # Append language instruction
+    prompt += _LOCALE_INSTRUCTIONS.get(locale, _LOCALE_INSTRUCTIONS["zh-CN"])
+
     return prompt
 
 
@@ -61,6 +92,7 @@ async def run_agent(
     db: Session,
     user_id: int = None,
     task_id: int = None,
+    locale: str = "zh-CN",
 ) -> AsyncGenerator[str, None]:
     """Run a single agent and stream its output"""
     from models import AgentKnowledge
@@ -71,7 +103,9 @@ async def run_agent(
         AgentKnowledge.is_active == True
     ).limit(5).all()
 
-    system_prompt = build_system_prompt(agent_type, knowledge_items, query=query, brand_name=brand_name)
+    system_prompt = build_system_prompt(
+        agent_type, knowledge_items, query=query, brand_name=brand_name, locale=locale,
+    )
 
     # Build user message
     user_content = f"品牌名称：{brand_name or '（待定）'}\n\n用户需求：{query}"
@@ -110,6 +144,7 @@ async def run_multi_agent(
     db: Session,
     user_id: int = None,
     task_id: int = None,
+    locale: str = "zh-CN",
 ) -> AsyncGenerator[dict, None]:
     """
     Orchestrate multiple agents sequentially.
@@ -135,7 +170,7 @@ async def run_multi_agent(
 
         async for chunk in run_agent(
             agent_type, query, brand_name, context, db,
-            user_id=user_id, task_id=task_id,
+            user_id=user_id, task_id=task_id, locale=locale,
         ):
             full_content.append(chunk)
             yield {"type": "chunk", "agent": agent_type, "content": chunk}

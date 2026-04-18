@@ -107,7 +107,7 @@ import { tasksAPI, agentsAPI } from '../api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const submitting = ref(false)
 
 const form = ref({ query: '', brand_name: '', agents_selected: ['strategy', 'brand', 'operations'] })
@@ -167,6 +167,7 @@ async function submitTask() {
       query: form.value.query,
       brand_name: form.value.brand_name,
       agents_selected: form.value.agents_selected,
+      locale: locale.value,
     })
     router.push(`/tasks/${task.id}`)
   } catch (e) {

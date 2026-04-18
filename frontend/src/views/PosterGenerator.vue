@@ -111,6 +111,45 @@
         </div>
       </div>
 
+      <!-- Product image upload (optional) -->
+      <div class="field">
+        <label>{{ $t('poster.productImage') }}</label>
+        <div class="product-uploader" :class="{ 'has-image': productPreview, dragging }"
+          @click="!productPreview && $refs.fileInput.click()"
+          @dragover.prevent="dragging = true"
+          @dragleave.prevent="dragging = false"
+          @drop.prevent="onDropFile">
+          <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp"
+            style="display:none" @change="onFileChange" />
+
+          <!-- Preview -->
+          <div v-if="productPreview" class="product-preview">
+            <img :src="productPreview" alt="product" />
+            <div class="product-overlay">
+              <span v-if="productUploading" class="product-hint">{{ $t('poster.productUploading') }}</span>
+              <span v-else class="product-hint ok">✓ {{ $t('poster.productUploaded') }}</span>
+              <button class="product-remove" @click.stop="removeProduct">
+                {{ $t('poster.productRemove') }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty drop zone -->
+          <div v-else class="product-drop">
+            <div class="product-drop-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M3 16l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="product-drop-label">{{ $t('poster.productDrop') }}</div>
+            <div class="product-drop-hint">{{ $t('poster.productAccept') }}</div>
+          </div>
+        </div>
+        <div class="product-hint-below">{{ $t('poster.productImageHint') }}</div>
+      </div>
+
       <!-- Style picker -->
       <div class="field">
         <label>{{ $t('poster.style') }}</label>
@@ -266,7 +305,56 @@ const form = reactive({
   size: 'portrait',
   style: 'natural',
   primaryColor: '',
+  productImageUrl: '',   // set after successful upload
 })
+
+// ── Product image upload state ───────────────────────────────────
+const fileInput = ref(null)
+const productPreview = ref('')
+const productUploading = ref(false)
+const dragging = ref(false)
+
+function _validateFile(f) {
+  const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(f.type)
+  if (!ok) { ElMessage.error(t('poster.productInvalidType')); return false }
+  if (f.size > 10 * 1024 * 1024) { ElMessage.error(t('poster.productTooLarge')); return false }
+  return true
+}
+
+async function _doUpload(file) {
+  if (!_validateFile(file)) return
+  // Local preview first (immediate UX)
+  const reader = new FileReader()
+  reader.onload = (e) => { productPreview.value = e.target.result }
+  reader.readAsDataURL(file)
+
+  productUploading.value = true
+  try {
+    const res = await posterAPI.uploadProduct(file)
+    form.productImageUrl = res.url
+  } catch (e) {
+    ElMessage.error(e.message || 'upload failed')
+    productPreview.value = ''
+    form.productImageUrl = ''
+  } finally {
+    productUploading.value = false
+  }
+}
+
+function onFileChange(e) {
+  const f = e.target.files?.[0]
+  if (f) _doUpload(f)
+  if (fileInput.value) fileInput.value.value = ''  // allow re-selecting same file
+}
+function onDropFile(e) {
+  dragging.value = false
+  const f = e.dataTransfer?.files?.[0]
+  if (f) _doUpload(f)
+}
+function removeProduct() {
+  productPreview.value = ''
+  form.productImageUrl = ''
+}
 
 const styles = computed(() => [
   { value: 'natural',  icon: '🌿', label: t('poster.styles.natural') },
@@ -427,6 +515,7 @@ async function handleGenerate() {
       size:          form.size,
       style:         form.style,
       primary_color: form.primaryColor || null,
+      product_image_url: form.productImageUrl || null,
     })
     generationId.value = res.generation_id
     store.fetchMe().catch(() => {})
@@ -800,6 +889,102 @@ select.field-input option { background: #12121a; color: var(--ybc-text); }
   border-radius: 8px; cursor: pointer; background: transparent;
 }
 .color-hex { flex: 1; font-family: 'SF Mono', Menlo, monospace; }
+
+/* Product uploader */
+.product-uploader {
+  position: relative;
+  border: 1.5px dashed var(--ybc-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: 0.15s;
+  overflow: hidden;
+  min-height: 140px;
+  cursor: pointer;
+}
+.product-uploader:hover { border-color: rgba(236, 72, 153, 0.35); background: rgba(236, 72, 153, 0.03); }
+.product-uploader.dragging {
+  border-color: #ec4899;
+  background: rgba(236, 72, 153, 0.08);
+  border-style: solid;
+}
+.product-uploader.has-image {
+  border-style: solid;
+  border-color: rgba(34, 197, 94, 0.3);
+  cursor: default;
+}
+
+.product-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--ybc-text-muted);
+}
+.product-drop-icon {
+  color: var(--ybc-text-muted);
+  margin-bottom: 10px;
+  opacity: 0.7;
+}
+.product-drop-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ybc-text);
+  margin-bottom: 4px;
+}
+.product-drop-hint {
+  font-size: 11px;
+  color: var(--ybc-text-faint);
+}
+
+.product-preview {
+  position: relative;
+  padding: 12px;
+  background: linear-gradient(135deg, #0a0a0f, #1a1a24);
+  min-height: 160px;
+  display: flex; align-items: center; justify-content: center;
+}
+.product-preview img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.product-overlay {
+  position: absolute; top: 8px; right: 8px;
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 6px;
+}
+.product-hint {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border-radius: 100px;
+  font-size: 11px;
+  backdrop-filter: blur(8px);
+}
+.product-hint.ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.product-remove {
+  padding: 4px 10px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 100px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  backdrop-filter: blur(8px);
+}
+.product-remove:hover { background: rgba(239, 68, 68, 0.25); color: #fff; }
+
+.product-hint-below {
+  font-size: 11px;
+  color: var(--ybc-text-muted);
+  margin-top: 6px;
+}
 
 /* Style grid */
 .style-grid {

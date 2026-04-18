@@ -94,6 +94,13 @@ async def lifespan(app: FastAPI):
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {dtype}"))
             conn.commit()
 
+        # Task locale column
+        if "tasks" in inspector.get_table_names():
+            task_cols = {c["name"] for c in inspector.get_columns("tasks")}
+            if "locale" not in task_cols:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN locale VARCHAR(10) DEFAULT 'zh-CN'"))
+                conn.commit()
+
     # Seed default membership plans if the table is empty
     db = next(get_db())
     try:
@@ -632,11 +639,14 @@ def create_task(
     agents = [a for a in body.agents_selected if a in valid_agents]
     if not agents:
         raise HTTPException(400, "请至少选择一个Agent专家")
+    # Accept UI locale, clamped to supported values
+    locale = body.locale if body.locale in ("zh-CN", "en", "ja") else "zh-CN"
     task = Task(
         user_id=current_user.id,
         query=body.query,
         agents_selected=agents,
         brand_name=body.brand_name,
+        locale=locale,
         status="pending",
     )
     db.add(task)
@@ -760,6 +770,7 @@ async def stream_task(
                 db=db,
                 user_id=user.id,
                 task_id=task.id,
+                locale=getattr(task, "locale", None) or "zh-CN",
             ):
                 etype = event.get("type")
                 if etype == "agent_start":
@@ -1206,6 +1217,9 @@ async def stream_task(
                         size=target_size,
                         industry=industry,
                         primary_color=primary_color,
+                        headline=event_keyword,  # bake into AI prompt
+                        subline=f"{brand_name} · 节气呈现",
+                        has_product_image=False,
                         db=db,
                     )
 
@@ -1231,10 +1245,11 @@ async def stream_task(
                             poster_img = compose_poster(
                                 background=bg, target_size=target_size,
                                 brand_name=brand_name,
-                                headline=event_keyword,
-                                subline=f"{brand_name} · 节气呈现",
+                                headline="",   # baked into AI prompt above
+                                subline="",
                                 event_date=_dt.now().strftime("%Y.%m.%d"),
                                 logo=None,
+                                product=None,
                                 primary_color=primary_color or None,
                                 add_footer=poster_cfg.get("add_footer", True),
                             )
@@ -2940,6 +2955,84 @@ async def test_poster_provider_route(
 # ─────────────────────────────────────────────
 # Poster Generation (User-facing)
 # ─────────────────────────────────────────────
+@app.post("/api/poster/upload-product", tags=["poster"])
+async def upload_poster_product(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a user product image to be composited onto generated posters.
+
+    Returns a URL that can be passed as `product_image_url` to
+    /api/poster/generate. File is stored under uploads/poster_products/.
+    """
+    # Validate
+    allowed = {"image/png", "image/jpeg", "image/webp"}
+    if file.content_type not in allowed:
+        raise HTTPException(400, "仅支持 PNG / JPG / WebP 图片")
+    raw = await file.read()
+    if len(raw) > 10 * 1024 * 1024:
+        raise HTTPException(400, "图片不能超过 10 MB")
+
+    import secrets as _secrets, re as _re
+    ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(file.content_type, "png")
+    safe_user = _re.sub(r"[^a-zA-Z0-9]", "_", current_user.username or "u")[:20]
+    fname = f"product_{safe_user}_{_secrets.token_hex(6)}.{ext}"
+
+    sub_dir = os.path.join(UPLOAD_DIR, "poster_products")
+    os.makedirs(sub_dir, exist_ok=True)
+    fpath = os.path.join(sub_dir, fname)
+    with open(fpath, "wb") as f:
+        f.write(raw)
+
+    token = create_access_token({"sub": current_user.username})
+    return {
+        "ok":   True,
+        "url":  f"/api/poster/product/{fname}?token={token}",
+        "path": f"poster_products/{fname}",
+        "size": len(raw),
+    }
+
+
+@app.get("/api/poster/product/{fname}", tags=["poster"])
+def fetch_poster_product(
+    fname: str,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    """Serve a user-uploaded product image."""
+    from jose import jwt, JWTError
+    from auth import SECRET_KEY, ALGORITHM
+    jwt_token = token
+    if not jwt_token and request is not None:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            jwt_token = auth_header[7:]
+    if not jwt_token:
+        raise HTTPException(401, "未提供身份凭证")
+    try:
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user = db.query(User).filter(User.username == payload.get("sub")).first()
+        if not user or not user.is_active:
+            raise HTTPException(401, "身份验证失败")
+    except JWTError:
+        raise HTTPException(401, "身份验证失败")
+    if "/" in fname or ".." in fname:
+        raise HTTPException(400, "invalid filename")
+    fpath = os.path.join(UPLOAD_DIR, "poster_products", fname)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "not found")
+    # Authorize: filename must contain the user's sanitized name OR user is admin
+    import re as _re
+    safe_user = _re.sub(r"[^a-zA-Z0-9]", "_", user.username or "u")[:20]
+    if user.role != "admin" and safe_user not in fname:
+        raise HTTPException(403, "not authorized")
+    ext = fname.rsplit(".", 1)[-1].lower()
+    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(ext, "image/png")
+    return FileResponse(path=fpath, filename=fname, media_type=mime)
+
+
 @app.post("/api/poster/generate", tags=["poster"])
 async def generate_poster(
     body: dict,
@@ -3024,6 +3117,7 @@ def _run_poster_generation(generation_id: int):
             size_key=gen.size or "portrait",
             primary_color=gen.primary_color,
             product_description=None,
+            product_image_url=gen.product_image_url,
             variant_count=1,
             user_id=gen.user_id,
         ))

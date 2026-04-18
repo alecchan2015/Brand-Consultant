@@ -107,22 +107,53 @@ def _rounded_rectangle(draw: ImageDraw.ImageDraw, xy, radius: int, fill):
         draw.rectangle(xy, fill=fill)
 
 
-# ── Compositor ─────────────────────────────────────────────────────────────
+# ── Soft gradient for legibility (no hard rectangles) ────────────────────
+def _apply_gradient_strip(canvas: Image.Image, rect: Tuple[int, int, int, int],
+                          max_alpha: int = 140, direction: str = "bottom") -> None:
+    """Paint a transparent→dark gradient strip for text legibility.
+
+    `direction="bottom"` = opaque at the outer edge fading inward. Much softer
+    than a hard semi-transparent rectangle.
+    """
+    x0, y0, x1, y1 = rect
+    w, h = x1 - x0, y1 - y0
+    if w <= 0 or h <= 0:
+        return
+    strip = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(strip)
+    if direction in ("top", "bottom"):
+        for i in range(h):
+            t = i / max(1, h - 1)
+            # Ease-in curve so the fade is smooth, not linear
+            alpha = int(max_alpha * (t if direction == "bottom" else (1 - t)) ** 1.8)
+            sd.line([(0, i), (w, i)], fill=(0, 0, 0, alpha))
+    canvas.alpha_composite(strip, (x0, y0))
+
+
+# ── Compositor (soft / editorial style) ─────────────────────────────────
 def compose_poster(
     *,
     background: Image.Image,
     target_size: Tuple[int, int],
     brand_name: str,
-    headline: str,
-    subline: str,
-    event_date: str,
+    headline: str = "",
+    subline: str = "",
+    event_date: str = "",
     logo: Optional[Image.Image] = None,
+    product: Optional[Image.Image] = None,
     primary_color: Optional[str] = None,
     add_footer: bool = True,
 ) -> Image.Image:
-    """Build the final poster from a background image + overlays."""
+    """Build the final poster from the AI-rendered background.
+
+    Philosophy: trust the AI for typography + atmosphere. Our job here is
+    only: (a) cover-fit, (b) optional product composite, (c) tiny brand tag
+    in the corner, (d) subtle bottom gradient for legibility if needed.
+    NO heavy black strips, NO stroked headline text stamping.
+    """
     W, H = target_size
-    # Cover-fit the background
+
+    # ── 1. Cover-fit the background ───────────────────────────────────
     bg = background.copy().convert("RGBA")
     bw, bh = bg.size
     scale = max(W / bw, H / bh)
@@ -130,79 +161,91 @@ def compose_poster(
     bg = bg.resize((new_w, new_h), Image.LANCZOS)
     off_x = (new_w - W) // 2
     off_y = (new_h - H) // 2
-    bg = bg.crop((off_x, off_y, off_x + W, off_y + H))
+    canvas = bg.crop((off_x, off_y, off_x + W, off_y + H)).convert("RGBA")
 
-    canvas = bg.copy()
-    draw = ImageDraw.Draw(canvas, "RGBA")
+    # ── 2. Optional product image composite (center-lower) ────────────
+    if product is not None:
+        try:
+            pw, ph = product.size
+            # Target: up to 52% of canvas width, keep aspect, leave room at bottom
+            max_w = int(W * 0.52)
+            max_h = int(H * 0.42)
+            pscale = min(max_w / pw, max_h / ph)
+            tw, th = int(pw * pscale), int(ph * pscale)
+            product_resized = product.resize((tw, th), Image.LANCZOS)
 
-    # ── Headline strip (top 28% with soft gradient for legibility) ────────
-    # Scale font size proportionally to canvas width
-    headline_size   = max(72, int(W * 0.095))
-    subline_size    = max(28, int(W * 0.028))
-    footer_size     = max(22, int(W * 0.016))
-    brand_tag_size  = max(20, int(W * 0.014))
+            # Soft drop shadow for natural "sitting on surface" feel
+            shadow = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+            sd = ImageDraw.Draw(shadow)
+            sd.ellipse((0, int(th * 0.88), tw, int(th * 1.05)),
+                       fill=(0, 0, 0, 90))
+            try:
+                from PIL import ImageFilter
+                shadow = shadow.filter(ImageFilter.GaussianBlur(radius=int(tw * 0.04)))
+            except Exception:
+                pass
 
-    if headline:
-        _rounded_rectangle(draw, (0, 0, W, int(H * 0.22)), radius=0,
-                            fill=(0, 0, 0, 70))  # subtle top darken
-        font_head = _load_font(headline_size, bold=True)
-        _draw_text_centered(
-            draw, headline,
-            (int(W * 0.08), int(H * 0.05), int(W * 0.92), int(H * 0.16)),
-            font_head, fill=(255, 255, 255, 255),
-            stroke_width=2, stroke_fill=(0, 0, 0, 140),
-        )
+            px = (W - tw) // 2
+            py = int(H * 0.50)   # center-lower
+            canvas.alpha_composite(shadow, (px, py + int(th * 0.05)))
+            canvas.alpha_composite(product_resized, (px, py))
+        except Exception as e:                                        # noqa: BLE001
+            print(f"[poster_service] product paste failed: {e}")
 
-    if subline:
-        font_sub = _load_font(subline_size)
-        _draw_text_centered(
-            draw, subline,
-            (int(W * 0.1), int(H * 0.165), int(W * 0.9), int(H * 0.205)),
-            font_sub, fill=(255, 255, 255, 230),
-        )
-
-    # ── Footer strip (bottom ~12%) with brand bar ────────────────────────
+    # ── 3. Minimal brand mark (bottom-right, small) + optional date ──
     if add_footer:
-        footer_h = int(H * 0.12)
-        # semi-transparent dark strip with optional primary-color accent
-        strip_color = (0, 0, 0, 180)
-        _rounded_rectangle(draw, (0, H - footer_h, W, H), radius=0,
-                            fill=strip_color)
+        # Subtle bottom gradient for legibility (not a hard black strip)
+        _apply_gradient_strip(canvas, (0, int(H * 0.88), W, H),
+                               max_alpha=120, direction="bottom")
 
-        # Accent line at top of footer
-        accent_hex = primary_color or "#6366f1"
+        # Accent tick + brand text, small, bottom-right
+        accent_hex = primary_color or "#ffffff"
         try:
             r = int(accent_hex[1:3], 16); g = int(accent_hex[3:5], 16); b = int(accent_hex[5:7], 16)
         except Exception:                                             # noqa: BLE001
-            r, g, b = 99, 102, 241
-        draw.rectangle((0, H - footer_h, W, H - footer_h + 3), fill=(r, g, b, 255))
+            r, g, b = 255, 255, 255
 
-        # Brand name in footer (right side)
-        font_brand = _load_font(footer_size, bold=True)
+        draw = ImageDraw.Draw(canvas, "RGBA")
+        brand_tag_size = max(18, int(W * 0.013))
+        font_brand = _load_font(int(brand_tag_size * 1.3), bold=True)
         font_date  = _load_font(brand_tag_size)
-        brand_text = brand_name
-        # Right-aligned
-        try:
-            bbox = draw.textbbox((0, 0), brand_text, font=font_brand)
-            tw = bbox[2] - bbox[0]
-        except Exception:
-            tw = len(brand_text) * footer_size
-        draw.text((W - tw - int(W * 0.04), H - footer_h + int(footer_h * 0.3)),
-                  brand_text, font=font_brand, fill=(255, 255, 255, 255))
-        if event_date:
-            draw.text((int(W * 0.04), H - footer_h + int(footer_h * 0.35)),
-                      event_date, font=font_date, fill=(255, 255, 255, 200))
 
-        # Logo in footer left-center (if provided)
-        if logo is not None:
+        # Small accent bar (4px × 32px) before brand name
+        bar_x = int(W * 0.06)
+        bar_y = int(H * 0.95)
+        draw.rectangle((bar_x, bar_y, bar_x + int(W * 0.02), bar_y + 3),
+                       fill=(r, g, b, 220))
+
+        if event_date:
+            draw.text((bar_x, bar_y + 8),
+                      event_date, font=font_date, fill=(255, 255, 255, 210))
+
+        if brand_name:
             try:
-                logo_target_h = int(footer_h * 0.55)
+                bbox = draw.textbbox((0, 0), brand_name, font=font_brand)
+                tw = bbox[2] - bbox[0]
+            except Exception:
+                tw = len(brand_name) * brand_tag_size
+            # Right-aligned, soft white with slight shadow for legibility
+            tx = W - tw - int(W * 0.06)
+            ty = int(H * 0.94)
+            # Shadow
+            draw.text((tx + 1, ty + 1), brand_name, font=font_brand,
+                      fill=(0, 0, 0, 150))
+            draw.text((tx, ty), brand_name, font=font_brand,
+                      fill=(255, 255, 255, 240))
+
+        # Optional small logo bottom-left (if provided and no date)
+        if logo is not None and not event_date:
+            try:
+                logo_target_h = int(W * 0.035)
                 lw, lh = logo.size
                 logo_target_w = int(lw * logo_target_h / lh)
                 logo_resized = logo.resize((logo_target_w, logo_target_h), Image.LANCZOS)
-                canvas.paste(logo_resized,
-                             (int(W * 0.04) + 0, H - footer_h + (footer_h - logo_target_h) // 2 - int(brand_tag_size * 1.4)),
-                             logo_resized)
+                canvas.alpha_composite(
+                    logo_resized,
+                    (bar_x + int(W * 0.025), int(H * 0.94))
+                )
             except Exception as e:                                    # noqa: BLE001
                 print(f"[poster_service] logo paste failed: {e}")
 
@@ -224,6 +267,7 @@ async def generate_poster_full(
     size_key: str = "portrait",
     primary_color: Optional[str] = None,
     product_description: Optional[str] = None,
+    product_image_url: Optional[str] = None,
     variant_count: int = 1,
     user_id: Optional[int] = None,
 ) -> None:
@@ -241,8 +285,24 @@ async def generate_poster_full(
     if not gen:
         return
 
+    # ── Load user product image if provided ────────────────────────────
+    product_img: Optional[Image.Image] = None
+    if product_image_url:
+        # If it's a local /api/poster/product/... URL, resolve to file path
+        if product_image_url.startswith("/api/poster/product/"):
+            fname = product_image_url.split("/")[-1].split("?")[0]
+            local_path = os.path.join(UPLOAD_DIR, "poster_products", fname)
+            if os.path.exists(local_path):
+                try:
+                    product_img = Image.open(local_path).convert("RGBA")
+                except Exception as e:
+                    print(f"[poster_service] local product load failed: {e}")
+        else:
+            # External URL — download it
+            product_img = await _download_image(product_image_url)
+
     try:
-        # 1. Generate background
+        # 1. Generate background (pass slogan + product hint into AI prompt)
         result, provider_name = await generate_via_providers(
             brand_name=brand_name,
             event_keyword=event_keyword or "",
@@ -252,6 +312,9 @@ async def generate_poster_full(
             industry=industry,
             primary_color=primary_color,
             product_description=product_description,
+            headline=headline or None,
+            subline=subline or None,
+            has_product_image=product_img is not None,
             db=db,
         )
         if not result.success or not result.variants:
@@ -270,13 +333,9 @@ async def generate_poster_full(
         safe_brand = sanitize_filename(brand_name)
         saved_variants = []
 
-        # Headline defaults: use event_keyword if user didn't provide one
-        final_headline = (headline or event_keyword or brand_name).strip()
-        final_subline  = (subline or "").strip()
-        final_date     = (event_date or datetime.now().strftime("%Y.%m.%d")).strip()
-
-        # Load brand logo if we have one cached (future: pull from brand assets)
-        # For now, skip — logo overlay optional.
+        # Headline/subline are now baked into AI prompt — compositor only adds
+        # tiny brand tag + optional product. Clean and editorial.
+        final_date = (event_date or datetime.now().strftime("%Y.%m.%d")).strip()
 
         for variant in result.variants:
             bg_img = None
@@ -291,10 +350,11 @@ async def generate_poster_full(
                 background=bg_img,
                 target_size=target_size,
                 brand_name=brand_name,
-                headline=final_headline,
-                subline=final_subline,
+                headline="",          # AI renders headline inside the image
+                subline="",           # same
                 event_date=final_date,
                 logo=None,
+                product=product_img,  # user-uploaded product (optional)
                 primary_color=primary_color,
                 add_footer=cfg.get("add_footer", True),
             )

@@ -154,6 +154,7 @@ class Task(Base):
     agents_selected = Column(JSON)  # list: ["strategy","brand","operations"]
     status = Column(String(20), default="pending")  # pending, processing, completed, failed
     brand_name = Column(String(200), nullable=True)
+    locale = Column(String(10), default="zh-CN")  # UI language when task was created
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
