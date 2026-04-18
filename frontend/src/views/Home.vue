@@ -8,14 +8,15 @@
           <span class="nav-title">Your Brand Consultant</span>
         </div>
         <div class="nav-actions">
+          <LangSwitch />
           <template v-if="store.isLoggedIn">
             <span class="nav-user">{{ store.user?.username }}</span>
-            <button class="btn-nav" @click="goToDashboard">工作台</button>
-            <button class="btn-nav btn-ghost" @click="handleLogout">退出</button>
+            <button class="btn-nav" @click="goToDashboard">{{ $t('nav.dashboard') }}</button>
+            <button class="btn-nav btn-ghost" @click="handleLogout">{{ $t('common.actions.logout') }}</button>
           </template>
           <template v-else>
-            <button class="btn-nav" @click="showLoginDialog = true">登录</button>
-            <button class="btn-nav btn-primary-nav" @click="showRegisterDialog = true">免费注册</button>
+            <button class="btn-nav" @click="showLoginDialog = true">{{ $t('common.actions.login') }}</button>
+            <button class="btn-nav btn-primary-nav" @click="showRegisterDialog = true">{{ $t('common.actions.freeSignup') }}</button>
           </template>
         </div>
         <!-- Mobile menu -->
@@ -26,13 +27,14 @@
       <!-- Mobile dropdown -->
       <transition name="slide-down">
         <div v-if="mobileMenuOpen" class="mobile-menu">
+          <div class="mobile-lang-wrap"><LangSwitch /></div>
           <template v-if="store.isLoggedIn">
-            <button @click="goToDashboard; mobileMenuOpen = false">工作台</button>
-            <button @click="handleLogout; mobileMenuOpen = false">退出</button>
+            <button @click="goToDashboard; mobileMenuOpen = false">{{ $t('nav.dashboard') }}</button>
+            <button @click="handleLogout; mobileMenuOpen = false">{{ $t('common.actions.logout') }}</button>
           </template>
           <template v-else>
-            <button @click="showLoginDialog = true; mobileMenuOpen = false">登录</button>
-            <button @click="showRegisterDialog = true; mobileMenuOpen = false">免费注册</button>
+            <button @click="showLoginDialog = true; mobileMenuOpen = false">{{ $t('common.actions.login') }}</button>
+            <button @click="showRegisterDialog = true; mobileMenuOpen = false">{{ $t('common.actions.freeSignup') }}</button>
           </template>
         </div>
       </transition>
@@ -55,14 +57,14 @@
       <div class="hero-content">
         <div class="hero-badge">
           <span class="badge-dot"></span>
-          AI 驱动 · 品牌战略平台
+          {{ $t('home.badge') }}
         </div>
         <h1 class="hero-title">
-          <span class="title-line">用 AI 重新定义</span>
-          <span class="title-line title-highlight">高端家具品牌战略</span>
+          <span class="title-line">{{ $t('home.heroLine1') }}</span>
+          <span class="title-line title-highlight">{{ $t('home.heroLine2') }}</span>
         </h1>
         <p class="hero-subtitle">
-          四大 AI 专家协同工作 — 从战略规划到品牌设计、Logo生成、运营落地，一句话启动全套品牌方案
+          {{ $t('home.subtitle') }}
         </p>
 
         <!-- Main Input Area -->
@@ -73,7 +75,7 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                <span>{{ showBrandInput ? '收起品牌名' : '添加品牌名称（选填）' }}</span>
+                <span>{{ showBrandInput ? $t('home.hideBrand') : $t('home.addBrand') }}</span>
               </div>
             </div>
             <transition name="expand">
@@ -81,7 +83,7 @@
                 <input
                   v-model="form.brand_name"
                   class="brand-input"
-                  placeholder="输入品牌名称，例如：木语、原木家..."
+                  :placeholder="$t('home.brandPlaceholder')"
                   maxlength="50"
                 />
               </div>
@@ -92,7 +94,7 @@
                 v-model="form.query"
                 class="main-input"
                 :rows="isMobile ? 3 : 2"
-                placeholder="描述您的品牌需求，例如：为定位中高端消费者的北欧简约风格家具品牌，制定全套品牌战略方案..."
+                :placeholder="$t('home.queryPlaceholder')"
                 maxlength="1000"
                 @keydown.enter.ctrl="handleSubmit"
                 @keydown.enter.meta="handleSubmit"
@@ -109,7 +111,7 @@
             </div>
             <div class="input-footer">
               <span class="char-count">{{ form.query.length }}/1000</span>
-              <span class="shortcut-hint">{{ isMobile ? '点击发送' : 'Ctrl+Enter 发送' }}</span>
+              <span class="shortcut-hint">{{ isMobile ? $t('home.shortcutHintMobile') : $t('home.shortcutHint') }}</span>
             </div>
           </div>
         </div>
@@ -117,9 +119,9 @@
         <!-- Agent Selection -->
         <div class="agent-section">
           <div class="agent-section-header">
-            <span class="agent-section-title">选择 AI 专家</span>
+            <span class="agent-section-title">{{ $t('home.selectAgent') }}</span>
             <button class="select-all-btn" @click="toggleSelectAll">
-              {{ allSelected ? '取消全选' : '全选' }}
+              {{ allSelected ? $t('home.deselectAll') : $t('home.selectAll') }}
             </button>
           </div>
           <div class="agent-cards">
@@ -148,7 +150,7 @@
                 <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
                 <path d="M8 5v3M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
-              多专家协作：{{ selectedAgentNames.join(' → ') }}
+              {{ $t('home.pipelineHint', { chain: selectedAgentNames.join(' → ') }) }}
             </div>
           </transition>
           <transition name="fade">
@@ -167,8 +169,8 @@
     <!-- Features Section -->
     <section class="features">
       <div class="features-inner">
-        <h2 class="section-heading">为什么选择 YBC</h2>
-        <p class="section-sub">四大AI专家，覆盖品牌建设全链路</p>
+        <h2 class="section-heading">{{ $t('home.features.title') }}</h2>
+        <p class="section-sub">{{ $t('home.features.subtitle') }}</p>
         <div class="features-grid">
           <div class="feature-card" v-for="f in features" :key="f.title">
             <div class="feature-icon">{{ f.icon }}</div>
@@ -182,7 +184,7 @@
     <!-- How it works -->
     <section class="how-it-works">
       <div class="how-inner">
-        <h2 class="section-heading">三步启动品牌战略</h2>
+        <h2 class="section-heading">{{ $t('home.steps.title') }}</h2>
         <div class="steps">
           <div class="step" v-for="(s, i) in steps" :key="i">
             <div class="step-num">{{ i + 1 }}</div>
@@ -196,9 +198,9 @@
     <!-- CTA -->
     <section class="cta-section">
       <div class="cta-inner">
-        <h2>开始构建您的品牌</h2>
-        <p>立即体验 AI 驱动的品牌战略咨询</p>
-        <button class="btn-cta" @click="scrollToInput">立即开始</button>
+        <h2>{{ $t('home.cta.title') }}</h2>
+        <p>{{ $t('home.cta.subtitle') }}</p>
+        <button class="btn-cta" @click="scrollToInput">{{ $t('home.cta.button') }}</button>
       </div>
     </section>
 
@@ -209,7 +211,7 @@
           <span class="nav-logo">YBC</span>
           <span>Your Brand Consultant</span>
         </div>
-        <p class="footer-copy">&copy; {{ new Date().getFullYear() }} Your Brand Consultant. AI-Powered Brand Strategy.</p>
+        <p class="footer-copy">{{ $t('footer.copyright', { year: new Date().getFullYear() }) }}</p>
       </div>
     </footer>
 
@@ -222,8 +224,8 @@
             <button class="modal-close" @click="closeAuthModals">&times;</button>
             <div class="modal-header">
               <span class="nav-logo modal-logo">YBC</span>
-              <h2>{{ showRegisterDialog ? '创建账户' : '欢迎回来' }}</h2>
-              <p>AI 品牌战略咨询平台</p>
+              <h2>{{ showRegisterDialog ? $t('auth.modalTitleRegister') : $t('auth.modalTitleLogin') }}</h2>
+              <p>{{ $t('auth.modalSub') }}</p>
             </div>
             <AuthTabs
               :initial-mode="showRegisterDialog ? 'register' : 'login'"
@@ -238,10 +240,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../store'
 import { authAPI, tasksAPI, agentsAPI } from '../api'
 import AuthTabs from '../components/AuthTabs.vue'
+import LangSwitch from '../components/LangSwitch.vue'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const store = useUserStore()
@@ -266,20 +272,26 @@ const submitting = ref(false)
 const queryInput = ref(null)
 
 // Agents
-const agents = ref([
-  { type: 'strategy', name: '战略规划', icon: '🎯', desc: '市场分析·竞争定位·品牌战略' },
-  { type: 'brand', name: '品牌设计', icon: '🎨', desc: 'VI体系·色彩规范·视觉物料' },
-  { type: 'logo_design', name: 'Logo设计', icon: '✨', desc: 'AI生成Logo·多格式输出' },
-  { type: 'poster_design', name: '海报设计', icon: '🖼️', desc: '节气商业海报·9:16 竖版' },
-  { type: 'operations', name: '运营实施', icon: '🚀', desc: '渠道策略·营销计划·执行路径' },
+const agents = computed(() => [
+  { type: 'strategy',      icon: '🎯', name: t('common.agent.strategy'),     desc: t('home.agentDesc.strategy') },
+  { type: 'brand',         icon: '🎨', name: t('common.agent.brand'),        desc: t('home.agentDesc.brand') },
+  { type: 'logo_design',   icon: '✨', name: t('common.agent.logoDesign'),   desc: t('home.agentDesc.logo_design') },
+  { type: 'poster_design', icon: '🖼️', name: t('common.agent.posterDesign'), desc: t('home.agentDesc.poster_design') },
+  { type: 'operations',    icon: '🚀', name: t('common.agent.operations'),   desc: t('home.agentDesc.operations') },
 ])
 
-const agentNameMap = { strategy: '战略规划', brand: '品牌设计', logo_design: 'Logo设计', poster_design: '海报设计', operations: '运营实施' }
-const selectedAgentNames = computed(() =>
-  ['strategy', 'brand', 'logo_design', 'poster_design', 'operations']
+const selectedAgentNames = computed(() => {
+  const nameMap = {
+    strategy:      t('common.agent.strategy'),
+    brand:         t('common.agent.brand'),
+    logo_design:   t('common.agent.logoDesign'),
+    poster_design: t('common.agent.posterDesign'),
+    operations:    t('common.agent.operations'),
+  }
+  return ['strategy', 'brand', 'logo_design', 'poster_design', 'operations']
     .filter(a => form.value.agents_selected.includes(a))
-    .map(a => agentNameMap[a])
-)
+    .map(a => nameMap[a])
+})
 const allSelected = computed(() => form.value.agents_selected.length === agents.value.length)
 
 function toggleAgent(type) {
@@ -321,9 +333,9 @@ const inlineError = ref('')
 
 function handleSubmit() {
   inlineError.value = ''
-  if (!form.value.query.trim()) { inlineError.value = '请先描述您的品牌需求'; return }
+  if (!form.value.query.trim()) { inlineError.value = t('home.errorNoQuery'); return }
   if (!form.value.agents_selected.length) {
-    inlineError.value = '请至少选择一位 AI 专家'
+    inlineError.value = t('home.errorNoAgent')
     return
   }
   if (!store.isLoggedIn) {
@@ -344,7 +356,7 @@ async function doSubmitTask() {
     })
     router.push(`/tasks/${task.id}`)
   } catch (e) {
-    inlineError.value = e.message || '任务创建失败，请稍后重试'
+    inlineError.value = e.message || t('home.errorCreate')
   } finally {
     submitting.value = false
   }
@@ -378,18 +390,18 @@ function scrollToInput() {
 }
 
 // Features data
-const features = [
-  { icon: '🎯', title: '战略规划', desc: 'SWOT分析、市场定位、竞争策略，精准锁定品牌方向' },
-  { icon: '🎨', title: '品牌设计', desc: 'VI体系、色彩规范、视觉物料，打造高端品牌形象' },
-  { icon: '✨', title: 'Logo生成', desc: 'AI智能设计Logo，输出PNG/SVG多格式文件' },
-  { icon: '🚀', title: '运营落地', desc: '渠道策略、营销日历、执行SOP，驱动品牌增长' },
-]
+const features = computed(() => [
+  { icon: '🎯', title: t('home.features.strategy.title'), desc: t('home.features.strategy.desc') },
+  { icon: '🎨', title: t('home.features.brand.title'),    desc: t('home.features.brand.desc') },
+  { icon: '✨', title: t('home.features.logo.title'),     desc: t('home.features.logo.desc') },
+  { icon: '🚀', title: t('home.features.ops.title'),      desc: t('home.features.ops.desc') },
+])
 
-const steps = [
-  { title: '描述需求', desc: '一句话说明您的品牌愿景和目标市场' },
-  { title: '选择专家', desc: '按需选择AI专家，支持单个或多专家协同' },
-  { title: '获取方案', desc: 'AI实时生成全套品牌战略方案与设计物料' },
-]
+const steps = computed(() => [
+  { title: t('home.steps.s1.title'), desc: t('home.steps.s1.desc') },
+  { title: t('home.steps.s2.title'), desc: t('home.steps.s2.desc') },
+  { title: t('home.steps.s3.title'), desc: t('home.steps.s3.desc') },
+])
 
 // Load agents from API
 onMounted(async () => {

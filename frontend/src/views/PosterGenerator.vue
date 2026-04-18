@@ -5,32 +5,32 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>工作台</span>
+      <span>{{ $t('common.backToDashboard') }}</span>
     </button>
 
     <div class="page-hero">
       <div class="hero-badge">
         <span class="dot"></span>
-        <span>AI Poster Studio</span>
+        <span>{{ $t('poster.badge') }}</span>
       </div>
-      <h1>海报智能生成</h1>
-      <p>输入节气关键词，AI 自动生成专业级商业海报 · 默认 2160×3840 · 9:16 竖版</p>
+      <h1>{{ $t('poster.title') }}</h1>
+      <p>{{ $t('poster.subtitle') }}</p>
     </div>
 
     <!-- Form (when no active generation) -->
     <div v-if="!generationId || generationError" class="form-card">
       <!-- Brand (only required field) -->
       <div class="field">
-        <label>品牌名称 <span class="req">*</span></label>
-        <input v-model="form.brandName" class="field-input" placeholder="例：木语 / 原木家 / 品质居"
+        <label>{{ $t('poster.brand') }} <span class="req">*</span></label>
+        <input v-model="form.brandName" class="field-input" :placeholder="$t('poster.brandPlaceholder')"
           maxlength="40" />
       </div>
 
       <!-- Event keyword — categorized picker with search (optional) -->
       <div class="field">
-        <label>主题关键词 <span class="opt">（选填，不填则默认「品牌宣传」）</span></label>
+        <label>{{ $t('poster.event') }} <span class="opt">{{ $t('poster.eventHintOpt') }}</span></label>
         <input v-model="form.eventKeyword" class="field-input"
-          placeholder="手动输入或在下方分类中选择..." maxlength="20" />
+          :placeholder="$t('poster.eventPlaceholder')" maxlength="20" />
 
         <div class="kw-browser">
           <!-- Category tabs -->
@@ -47,8 +47,8 @@
           <!-- Search bar for the current category -->
           <div class="kw-search-row">
             <input v-model="kwSearch" class="kw-search"
-              placeholder="在当前分类中搜索关键词..." />
-            <span class="kw-hint">已显示 {{ filteredKeywords.length }} 项</span>
+              :placeholder="$t('poster.kwBrowser.searchPlaceholder')" />
+            <span class="kw-hint">{{ $t('poster.kwBrowser.shown', { n: filteredKeywords.length }) }}</span>
           </div>
 
           <!-- Keyword grid -->
@@ -57,7 +57,7 @@
               class="kw-item" :class="{ active: form.eventKeyword === kw }"
               @click="form.eventKeyword = kw">{{ kw }}</button>
             <div v-if="!filteredKeywords.length" class="kw-empty">
-              当前分类无匹配项，可直接在上方输入框自定义
+              {{ $t('poster.kwBrowser.empty') }}
             </div>
           </div>
         </div>
@@ -66,44 +66,44 @@
       <!-- Slogan + subline row (both optional) -->
       <div class="row-2">
         <div class="field">
-          <label>宣传 Slogan <span class="opt">（选填，作为海报主标题）</span></label>
+          <label>{{ $t('poster.slogan') }} <span class="opt">{{ $t('poster.sloganHint') }}</span></label>
           <input v-model="form.headline" class="field-input"
-            placeholder="例：春雨润万物 / 匠心如初 / 质造美好生活" maxlength="30" />
+            :placeholder="$t('poster.sloganPlaceholder')" maxlength="30" />
         </div>
         <div class="field">
-          <label>副标题 <span class="opt">（选填）</span></label>
+          <label>{{ $t('poster.subline') }} <span class="opt">{{ $t('poster.sublineHint') }}</span></label>
           <input v-model="form.subline" class="field-input"
-            placeholder="例：美好肆意生长 / 限时 8 折" maxlength="60" />
+            :placeholder="$t('poster.sublinePlaceholder')" maxlength="60" />
         </div>
       </div>
 
       <!-- Industry + size + style row -->
       <div class="row-3">
         <div class="field">
-          <label>所属行业</label>
+          <label>{{ $t('poster.industry') }}</label>
           <select v-model="form.industry" class="field-input">
-            <option value="">（自动推断）</option>
-            <option value="家居家具">家居家具</option>
-            <option value="美妆护肤">美妆护肤</option>
-            <option value="科技智能">科技智能</option>
-            <option value="食品饮料">食品饮料</option>
-            <option value="服装时尚">服装时尚</option>
-            <option value="教育培训">教育培训</option>
-            <option value="医疗健康">医疗健康</option>
+            <option value="">{{ $t('poster.industryAuto') }}</option>
+            <option value="家居家具">{{ $t('logo.industries.furniture') }}</option>
+            <option value="美妆护肤">{{ $t('logo.industries.beauty') }}</option>
+            <option value="科技智能">{{ $t('logo.industries.tech') }}</option>
+            <option value="食品饮料">{{ $t('logo.industries.food') }}</option>
+            <option value="服装时尚">{{ $t('logo.industries.fashion') }}</option>
+            <option value="教育培训">{{ $t('logo.industries.education') }}</option>
+            <option value="医疗健康">{{ $t('logo.industries.health') }}</option>
           </select>
         </div>
         <div class="field">
-          <label>尺寸</label>
+          <label>{{ $t('poster.size') }}</label>
           <select v-model="form.size" class="field-input">
-            <option value="portrait">9:16 竖版（2160×3840）</option>
-            <option value="story">9:16 Story（1080×1920）</option>
-            <option value="square">1:1 方形（2048×2048）</option>
-            <option value="landscape">16:9 横版（1920×1080）</option>
-            <option value="a3">A3 印刷（2480×3508）</option>
+            <option value="portrait">{{ $t('poster.sizes.portrait') }}</option>
+            <option value="story">{{ $t('poster.sizes.story') }}</option>
+            <option value="square">{{ $t('poster.sizes.square') }}</option>
+            <option value="landscape">{{ $t('poster.sizes.landscape') }}</option>
+            <option value="a3">{{ $t('poster.sizes.a3') }}</option>
           </select>
         </div>
         <div class="field">
-          <label>主色（选填）</label>
+          <label>{{ $t('poster.primaryColor') }}</label>
           <div class="color-input-row">
             <input type="color" v-model="form.primaryColor" class="color-swatch" />
             <input v-model="form.primaryColor" class="field-input color-hex" placeholder="#6366f1" maxlength="7" />
@@ -113,7 +113,7 @@
 
       <!-- Style picker -->
       <div class="field">
-        <label>视觉风格</label>
+        <label>{{ $t('poster.style') }}</label>
         <div class="style-grid">
           <div
             v-for="s in styles" :key="s.value"
@@ -133,8 +133,8 @@
           <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
           <path d="M8 4v4l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <span>本次生成消耗 <b>{{ creditCost }}</b> 积分 · 当前余额 <b>{{ userCredits }}</b></span>
-        <span v-if="userCredits < creditCost" class="insufficient">余额不足</span>
+        <span>{{ $t('poster.creditInfo', { cost: creditCost, balance: userCredits }) }}</span>
+        <span v-if="userCredits < creditCost" class="insufficient">{{ $t('poster.insufficient') }}</span>
       </div>
 
       <button class="generate-btn" :disabled="!canGenerate || generating" @click="handleGenerate">
@@ -142,7 +142,7 @@
         <svg v-else width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path d="M9 1L11 6L16 7L12 11L13 16L9 13.5L5 16L6 11L2 7L7 6L9 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
         </svg>
-        <span>{{ generating ? '生成中…' : '✨ 开始生成海报' }}</span>
+        <span>{{ generating ? $t('poster.submitting') : $t('poster.submit') }}</span>
       </button>
     </div>
 
@@ -150,7 +150,7 @@
     <div v-if="generationId && !generationDone && !generationError" class="progress-card">
       <div class="progress-head">
         <div class="pulse"></div>
-        <span>正在生成海报，请耐心等待…</span>
+        <span>{{ $t('poster.progress.title') }}</span>
       </div>
       <div class="progress-track">
         <div class="progress-fill" :style="{ width: progress.percent + '%' }"></div>
@@ -175,13 +175,13 @@
     <!-- Result -->
     <div v-if="generationDone && variants.length" class="result-card">
       <div class="result-head">
-        <h3>海报生成结果</h3>
+        <h3>{{ $t('poster.result.title') }}</h3>
         <button class="ghost-btn" @click="handleReset">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M13 3v4h-4M3 13v-4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M4.2 6a5 5 0 018-1.5L13 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          重新生成
+          {{ $t('poster.result.reset') }}
         </button>
       </div>
 
@@ -190,9 +190,9 @@
           :class="{ selected: selectedVariant === idx }"
           @click="selectedVariant = idx">
           <div class="variant-preview">
-            <img :src="posterImgUrl(v)" :alt="`方案 ${idx + 1}`" />
+            <img :src="posterImgUrl(v)" :alt="$t('poster.result.variant', { n: idx + 1 })" />
           </div>
-          <div class="variant-label">方案 {{ idx + 1 }}</div>
+          <div class="variant-label">{{ $t('poster.result.variant', { n: idx + 1 }) }}</div>
         </div>
       </div>
 
@@ -202,7 +202,7 @@
             <path d="M8 2v9M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M3 14h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          下载 PNG
+          {{ $t('poster.result.dlBtn') }}
         </button>
       </div>
     </div>
@@ -210,11 +210,11 @@
     <!-- History -->
     <div class="history-card">
       <div class="history-head">
-        <h3>📋 生成历史</h3>
-        <button class="ghost-btn small" @click="loadHistory">刷新</button>
+        <h3>📋 {{ $t('poster.history.title') }}</h3>
+        <button class="ghost-btn small" @click="loadHistory">{{ $t('poster.history.refresh') }}</button>
       </div>
       <div v-if="!history.length && !historyLoading" class="history-empty">
-        还没有生成记录
+        {{ $t('poster.history.empty') }}
       </div>
       <div v-else class="history-list">
         <div v-for="item in history" :key="item.id" class="history-item"
@@ -229,14 +229,14 @@
             <div class="history-title">{{ item.brand_name }} · {{ item.event_keyword }}</div>
             <div class="history-meta">
               <span class="status-chip" :class="`s-${item.status}`">
-                {{ item.status === 'done' ? '完成' : (item.status === 'failed' ? '失败' : '生成中') }}
+                {{ item.status === 'done' ? $t('poster.history.statusDone') : (item.status === 'failed' ? $t('poster.history.statusFailed') : $t('poster.history.statusProcessing')) }}
               </span>
               <span>{{ styleLabel(item.style) }}</span>
               <span class="time">{{ formatTime(item.created_at) }}</span>
             </div>
           </div>
           <button v-if="item.status === 'done'" class="history-dl" @click.stop="downloadHistory(item)">
-            下载
+            {{ $t('poster.history.download') }}
           </button>
         </div>
       </div>
@@ -246,9 +246,13 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store'
 import { posterAPI } from '../api'
+
+// ── i18n ─────────────────────────────────────────────
+const { t } = useI18n()
 
 const store = useUserStore()
 const userCredits = computed(() => store.user?.credits ?? 0)
@@ -264,17 +268,17 @@ const form = reactive({
   primaryColor: '',
 })
 
-const styles = [
-  { value: 'natural',  icon: '🌿', label: '自然写实' },
-  { value: 'luxury',   icon: '💎', label: '奢华高端' },
-  { value: 'modern',   icon: '🔲', label: '现代简约' },
-  { value: 'playful',  icon: '🎈', label: '活泼趣味' },
-  { value: 'heritage', icon: '🏮', label: '东方古韵' },
-]
+const styles = computed(() => [
+  { value: 'natural',  icon: '🌿', label: t('poster.styles.natural') },
+  { value: 'luxury',   icon: '💎', label: t('poster.styles.luxury') },
+  { value: 'modern',   icon: '🔲', label: t('poster.styles.modern') },
+  { value: 'playful',  icon: '🎈', label: t('poster.styles.playful') },
+  { value: 'heritage', icon: '🏮', label: t('poster.styles.heritage') },
+])
 
-const keywordCategories = [
+const keywordCategories = computed(() => [
   {
-    key: 'seasons', icon: '🌿', label: '二十四节气',
+    key: 'seasons', icon: '🌿', label: t('poster.kwBrowser.categories.seasons'),
     items: [
       // 春
       '立春', '雨水', '惊蛰', '春分', '清明', '谷雨',
@@ -287,7 +291,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'festivals', icon: '🎉', label: '传统节日',
+    key: 'festivals', icon: '🎉', label: t('poster.kwBrowser.categories.festivals'),
     items: [
       '春节', '除夕', '元宵', '龙抬头', '上巳', '寒食', '清明祭',
       '端午', '七夕', '中元', '中秋', '重阳', '下元', '腊八',
@@ -295,7 +299,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'modern', icon: '💝', label: '现代节日',
+    key: 'modern', icon: '💝', label: t('poster.kwBrowser.categories.modern'),
     items: [
       '元旦', '情人节', '妇女节', '女神节', '植树节', '愚人节',
       '劳动节', '青年节', '母亲节', '儿童节', '父亲节', '建军节',
@@ -304,7 +308,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'marketing', icon: '🛍️', label: '营销节点',
+    key: 'marketing', icon: '🛍️', label: t('poster.kwBrowser.categories.marketing'),
     items: [
       // 电商大促
       '年货节', '女王节', '开学季', '国货节', '618 大促', '618 狂欢',
@@ -320,7 +324,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'furniture', icon: '🛋️', label: '家具建材',
+    key: 'furniture', icon: '🛋️', label: t('poster.kwBrowser.categories.furniture'),
     items: [
       // 产品类
       '沙发焕新', '床垫专场', '茶几臻选', '餐桌大促',
@@ -340,7 +344,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'lifestyle', icon: '🌅', label: '生活方式',
+    key: 'lifestyle', icon: '🌅', label: t('poster.kwBrowser.categories.lifestyle'),
     items: [
       '质造生活', '美好家居', '匠心如初', '家的温度',
       '归心之所', '舒适空间', '理想居所', '烟火人间',
@@ -351,7 +355,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'scenes', icon: '🏠', label: '应用场景',
+    key: 'scenes', icon: '🏠', label: t('poster.kwBrowser.categories.scenes'),
     items: [
       '客厅美学', '卧室温馨', '书房雅韵', '餐厨烟火',
       '儿童房', '玄关第一印象', '阳台花园', '浴室焕新',
@@ -361,7 +365,7 @@ const keywordCategories = [
     ],
   },
   {
-    key: 'vibe', icon: '✨', label: '情绪氛围',
+    key: 'vibe', icon: '✨', label: t('poster.kwBrowser.categories.vibe'),
     items: [
       '新年伊始', '春意盎然', '夏日清凉', '金秋收获', '冬日温暖',
       '年末盘点', '跨年时刻', '感恩回馈', '开工纳福',
@@ -370,13 +374,13 @@ const keywordCategories = [
       '暖阳午后', '月色阑珊', '晨雾朦胧', '细雨如丝',
     ],
   },
-]
+])
 
 // Active category + search state
 const activeCategory = ref('seasons')
 const kwSearch = ref('')
 const filteredKeywords = computed(() => {
-  const cat = keywordCategories.find(c => c.key === activeCategory.value)
+  const cat = keywordCategories.value.find(c => c.key === activeCategory.value)
   if (!cat) return []
   const q = kwSearch.value.trim().toLowerCase()
   if (!q) return cat.items
@@ -398,12 +402,12 @@ const selectedVariant = ref(0)
 const progress = reactive({ percent: 0, label: '' })
 let eventSource = null
 
-const progressSteps = [
-  { label: '准备提示词', at: 5 },
-  { label: '生成背景',   at: 30 },
-  { label: '合成图层',   at: 70 },
-  { label: '完成',       at: 100 },
-]
+const progressSteps = computed(() => [
+  { label: t('poster.progress.steps.prepare'), at: 5 },
+  { label: t('poster.progress.steps.bg'),      at: 30 },
+  { label: t('poster.progress.steps.compose'), at: 70 },
+  { label: t('poster.progress.steps.done'),    at: 100 },
+])
 
 async function handleGenerate() {
   if (!canGenerate.value) return
@@ -428,7 +432,7 @@ async function handleGenerate() {
     store.fetchMe().catch(() => {})
     startProgressPolling(res.generation_id)
   } catch (e) {
-    generationError.value = e.message || '生成请求失败'
+    generationError.value = e.message || t('poster.errConnection')
     ElMessage.error(generationError.value)
   } finally {
     generating.value = false
@@ -453,9 +457,9 @@ function startProgressPolling(id) {
         selectedVariant.value = 0
         closeEventSource()
         loadHistory()
-        ElMessage.success('海报生成完成')
+        ElMessage.success(t('poster.successGen'))
       } else if (data.type === 'error') {
-        generationError.value = data.message || '生成失败'
+        generationError.value = data.message || t('poster.errConnection')
         closeEventSource()
         ElMessage.error(generationError.value)
       }
@@ -464,7 +468,7 @@ function startProgressPolling(id) {
   eventSource.onerror = () => {
     closeEventSource()
     if (!generationDone.value && !generationError.value) {
-      generationError.value = '连接中断，请刷新页面重试'
+      generationError.value = t('poster.errConnection')
     }
   }
 }
@@ -500,7 +504,7 @@ function handleDownload() {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  ElMessage.success('已开始下载')
+  ElMessage.success(t('poster.downloadStarted'))
 }
 
 function handleReset() {
@@ -552,7 +556,7 @@ function downloadHistory(item) {
 }
 
 function styleLabel(v) {
-  return styles.find(s => s.value === v)?.label || v || ''
+  return styles.value.find(s => s.value === v)?.label || v || ''
 }
 function formatTime(iso) {
   if (!iso) return ''

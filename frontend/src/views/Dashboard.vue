@@ -4,14 +4,14 @@
     <div class="hero">
       <div class="hero-content">
         <div class="hero-text">
-          <h1>我的工作台</h1>
-          <p>AI 品牌战略任务 · 实时生成 · 全流程协作</p>
+          <h1>{{ $t('dashboard.title') }}</h1>
+          <p>{{ $t('dashboard.subtitle') }}</p>
         </div>
         <button class="btn-primary" @click="$router.push('/tasks/new')">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <span>新建任务</span>
+          <span>{{ $t('dashboard.newTask') }}</span>
         </button>
       </div>
 
@@ -19,15 +19,15 @@
       <div class="stat-row">
         <div class="stat-chip">
           <span class="stat-num">{{ tasks.length }}</span>
-          <span class="stat-label">总任务</span>
+          <span class="stat-label">{{ $t('dashboard.stats.total') }}</span>
         </div>
         <div class="stat-chip">
           <span class="stat-num">{{ completedCount }}</span>
-          <span class="stat-label">已完成</span>
+          <span class="stat-label">{{ $t('dashboard.stats.completed') }}</span>
         </div>
         <div class="stat-chip">
           <span class="stat-num">{{ processingCount }}</span>
-          <span class="stat-label">进行中</span>
+          <span class="stat-label">{{ $t('dashboard.stats.processing') }}</span>
         </div>
       </div>
     </div>
@@ -47,9 +47,9 @@
         <div class="empty-glow"></div>
         <span class="empty-emoji">🎯</span>
       </div>
-      <h3>还没有任务</h3>
-      <p>点击「新建任务」，让 AI 专家团队为您打造品牌战略</p>
-      <button class="btn-primary" @click="$router.push('/tasks/new')">立即开始</button>
+      <h3>{{ $t('dashboard.empty.title') }}</h3>
+      <p>{{ $t('dashboard.empty.desc') }}</p>
+      <button class="btn-primary" @click="$router.push('/tasks/new')">{{ $t('dashboard.empty.cta') }}</button>
     </div>
 
     <!-- Task grid -->
@@ -84,7 +84,7 @@
               {{ task.brand_name }}
             </span>
             <span v-if="task.results?.length" class="files-badge">
-              📄 {{ task.results.length }} 个文件
+              📄 {{ $t('dashboard.filesCount', { n: task.results.length }) }}
             </span>
           </div>
           <span class="task-time">{{ formatTime(task.created_at) }}</span>
@@ -96,32 +96,43 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { tasksAPI } from '../api'
+
+const { t } = useI18n()
 
 const tasks = ref([])
 const loading = ref(false)
 
-const agentNames = {
-  strategy: '战略规划', brand: '品牌设计',
-  operations: '运营实施', logo_design: 'Logo设计', poster_design: '海报设计',
-}
+const agentNames = computed(() => ({
+  strategy: t('common.agent.strategy'),
+  brand: t('common.agent.brand'),
+  operations: t('common.agent.operations'),
+  logo_design: t('common.agent.logoDesign'),
+  poster_design: t('common.agent.posterDesign'),
+}))
 const agentIcons = {
   strategy: '🎯', brand: '🎨', logo_design: '✨', poster_design: '🖼️', operations: '🚀',
 }
-const statusLabel = { pending: '待处理', processing: '进行中', completed: '已完成', failed: '失败' }
+const statusLabel = computed(() => ({
+  pending: t('common.status.pending'),
+  processing: t('common.status.processing'),
+  completed: t('common.status.completed'),
+  failed: t('common.status.failed'),
+}))
 
-const completedCount = computed(() => tasks.value.filter(t => t.status === 'completed').length)
-const processingCount = computed(() => tasks.value.filter(t => ['pending', 'processing'].includes(t.status)).length)
+const completedCount = computed(() => tasks.value.filter(task => task.status === 'completed').length)
+const processingCount = computed(() => tasks.value.filter(task => ['pending', 'processing'].includes(task.status)).length)
 
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
+function formatTime(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
   const now = new Date()
   const diff = (now - d) / 1000
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
-  if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`
+  if (diff < 60) return t('dashboard.time.justNow')
+  if (diff < 3600) return t('dashboard.time.minutesAgo', { n: Math.floor(diff / 60) })
+  if (diff < 86400) return t('dashboard.time.hoursAgo', { n: Math.floor(diff / 3600) })
+  if (diff < 604800) return t('dashboard.time.daysAgo', { n: Math.floor(diff / 86400) })
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 

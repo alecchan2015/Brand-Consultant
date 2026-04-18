@@ -4,48 +4,48 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>返回</span>
+      <span>{{ $t('common.back') }}</span>
     </button>
 
     <div class="page-hero">
       <div class="hero-badge">
         <span class="dot"></span>
-        <span>AI-Powered Task</span>
+        <span>{{ $t('newTask.badge') }}</span>
       </div>
-      <h1>新建品牌策划任务</h1>
-      <p>描述您的需求，选择 AI 专家，全流程自动化生成</p>
+      <h1>{{ $t('newTask.title') }}</h1>
+      <p>{{ $t('newTask.subtitle') }}</p>
     </div>
 
     <div class="form-card">
       <!-- Brand Name -->
       <div class="form-section">
         <label class="section-label">
-          <span>品牌名称</span>
-          <span class="opt">· 选填</span>
+          <span>{{ $t('newTask.brandName') }}</span>
+          <span class="opt">· {{ $t('common.optional') }}</span>
         </label>
         <input v-model="form.brand_name" class="field-input"
-          placeholder="例如：木语、原木家、品质居" maxlength="50" />
+          :placeholder="$t('newTask.brandPlaceholder')" maxlength="50" />
       </div>
 
       <!-- Query -->
       <div class="form-section">
         <label class="section-label">
-          <span>您的需求</span>
+          <span>{{ $t('newTask.query') }}</span>
           <span class="required">*</span>
         </label>
         <textarea v-model="form.query" class="field-input field-textarea"
           :rows="4" maxlength="1000"
-          placeholder="例如：我想创建一个定位中高端消费者的北欧简约风格家具品牌，目标市场是25-40岁的城市精英群体..."></textarea>
+          :placeholder="$t('newTask.queryPlaceholder')"></textarea>
         <div class="counter">{{ form.query.length }} / 1000</div>
       </div>
 
       <!-- Agent Selection -->
       <div class="form-section">
         <label class="section-label">
-          <span>选择 AI 专家</span>
+          <span>{{ $t('newTask.selectAgent') }}</span>
           <span class="required">*</span>
         </label>
-        <p class="section-hint">可选单个或多个专家协作，多专家将按顺序分工合作</p>
+        <p class="section-hint">{{ $t('newTask.agentHint') }}</p>
         <div class="agent-grid">
           <div
             v-for="agent in agents" :key="agent.type"
@@ -67,8 +67,8 @@
         </div>
 
         <div class="quick-row">
-          <button class="quick-btn" @click="selectAll">全选（{{ agents.length }} 专家协作）</button>
-          <button class="quick-btn" @click="form.agents_selected = []">清空</button>
+          <button class="quick-btn" @click="selectAll">{{ $t('newTask.selectAllN', { n: agents.length }) }}</button>
+          <button class="quick-btn" @click="form.agents_selected = []">{{ $t('newTask.clear') }}</button>
         </div>
       </div>
 
@@ -79,7 +79,7 @@
             <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
             <path d="M8 5v4l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          <span>多专家协作：{{ selectedAgentNames.join(' → ') }}</span>
+          <span>{{ $t('newTask.pipelineHint', { chain: selectedAgentNames.join(' → ') }) }}</span>
         </div>
       </transition>
 
@@ -93,7 +93,7 @@
           <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>{{ submitting ? '启动中…' : '启动 AI 分析' }}</span>
+        <span>{{ submitting ? $t('newTask.submitting') : $t('newTask.submit') }}</span>
       </button>
     </div>
   </div>
@@ -102,31 +102,51 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { tasksAPI, agentsAPI } from '../api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const { t } = useI18n()
 const submitting = ref(false)
 
 const form = ref({ query: '', brand_name: '', agents_selected: ['strategy', 'brand', 'operations'] })
 
-const agents = ref([
-  { type: 'strategy',      name: '战略规划专家', icon: '🎯', desc: '市场分析·竞争定位·品牌战略规划' },
-  { type: 'brand',         name: '品牌设计专家', icon: '🎨', desc: 'Logo概念·色彩体系·视觉物料规范' },
-  { type: 'logo_design',   name: 'Logo 设计专家', icon: '✨', desc: 'AI智能生成Logo，输出 PNG/PSD/SVG' },
-  { type: 'poster_design', name: '海报设计专家', icon: '🖼️', desc: '节气/节日商业海报，9:16 竖版 2160×3840' },
-  { type: 'operations',    name: '运营实施专家', icon: '🚀', desc: '渠道策略·营销计划·执行路径' },
-])
+const defaultAgentDescMap = computed(() => ({
+  strategy: t('newTask.agentDesc.strategy'),
+  brand: t('newTask.agentDesc.brand'),
+  logo_design: t('newTask.agentDesc.logo_design'),
+  poster_design: t('newTask.agentDesc.poster_design'),
+  operations: t('newTask.agentDesc.operations'),
+}))
 
-const agentNames = {
-  strategy: '战略规划', brand: '品牌设计',
-  logo_design: 'Logo设计', poster_design: '海报设计', operations: '运营实施',
-}
+const remoteAgents = ref(null)
+
+const agents = computed(() => {
+  if (remoteAgents.value) {
+    return remoteAgents.value.map(a => ({ ...a, desc: defaultAgentDescMap.value[a.type] || '' }))
+  }
+  return [
+    { type: 'strategy',      name: t('common.agent.strategyFull'), icon: '🎯', desc: t('newTask.agentDesc.strategy') },
+    { type: 'brand',         name: t('common.agent.brandFull'), icon: '🎨', desc: t('newTask.agentDesc.brand') },
+    { type: 'logo_design',   name: t('common.agent.logoDesignFull'), icon: '✨', desc: t('newTask.agentDesc.logo_design') },
+    { type: 'poster_design', name: t('common.agent.posterDesignFull'), icon: '🖼️', desc: t('newTask.agentDesc.poster_design') },
+    { type: 'operations',    name: t('common.agent.operationsFull'), icon: '🚀', desc: t('newTask.agentDesc.operations') },
+  ]
+})
+
+const agentNames = computed(() => ({
+  strategy: t('common.agent.strategy'),
+  brand: t('common.agent.brand'),
+  logo_design: t('common.agent.logoDesign'),
+  poster_design: t('common.agent.posterDesign'),
+  operations: t('common.agent.operations'),
+}))
 
 const selectedAgentNames = computed(() =>
   ['strategy', 'brand', 'logo_design', 'poster_design', 'operations']
     .filter(a => form.value.agents_selected.includes(a))
-    .map(a => agentNames[a])
+    .map(a => agentNames.value[a])
 )
 
 function toggleAgent(type) {
@@ -139,8 +159,8 @@ function selectAll() {
 }
 
 async function submitTask() {
-  if (!form.value.query.trim()) { ElMessage.warning('请输入需求'); return }
-  if (!form.value.agents_selected.length) { ElMessage.warning('请选择至少一个专家'); return }
+  if (!form.value.query.trim()) { ElMessage.warning(t('newTask.errNoQuery')); return }
+  if (!form.value.agents_selected.length) { ElMessage.warning(t('newTask.errNoAgent')); return }
   submitting.value = true
   try {
     const task = await tasksAPI.create({
@@ -160,13 +180,7 @@ onMounted(async () => {
   try {
     const list = await agentsAPI.list()
     if (list?.length) {
-      const descMap = {
-        strategy: '市场分析·竞争定位·品牌战略规划',
-        brand: 'Logo概念·色彩体系·视觉物料规范',
-        logo_design: 'AI智能生成Logo，输出 PNG/PSD/SVG',
-        operations: '渠道策略·营销计划·执行路径',
-      }
-      agents.value = list.map(a => ({ ...a, desc: descMap[a.type] || '' }))
+      remoteAgents.value = list
     }
   } catch {}
 })

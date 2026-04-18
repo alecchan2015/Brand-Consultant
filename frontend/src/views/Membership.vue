@@ -7,20 +7,20 @@
         <div class="hero-left">
           <div class="tier-badge">
             <span class="tier-icon">{{ tierIcon(me?.tier) }}</span>
-            <span class="tier-text">{{ me?.tier_label || '普通用户' }}</span>
+            <span class="tier-text">{{ me?.tier_label || $t('common.tier.regular') }}</span>
           </div>
-          <h1 v-if="me?.tier === 'regular'">解锁商业级品牌策略</h1>
-          <h1 v-else>{{ me?.tier_label }} 会员 · 尊享体验</h1>
+          <h1 v-if="me?.tier === 'regular'">{{ $t('membership.upgradeTitle') }}</h1>
+          <h1 v-else>{{ $t('membership.activeTitle', { tier: me?.tier_label }) }}</h1>
           <p v-if="me?.tier !== 'regular' && me?.tier_expires_at" class="expiry">
-            有效期至 <b>{{ formatDate(me.tier_expires_at) }}</b>
-            <span v-if="me?.days_remaining !== null" class="days-left"> · 剩余 {{ me.days_remaining }} 天</span>
+            {{ $t('membership.expiresAt', { date: formatDate(me.tier_expires_at) }) }}
+            <span v-if="me?.days_remaining !== null" class="days-left">{{ $t('membership.daysLeft', { n: me.days_remaining }) }}</span>
           </p>
-          <p v-else class="expiry-hint">升级后解锁 Gamma 商业级 PPT、高分辨率 Logo、专属服务等高端权益</p>
+          <p v-else class="expiry-hint">{{ $t('membership.upgradeHint') }}</p>
         </div>
 
         <div v-if="me?.support_info && me.tier !== 'regular'" class="support-box">
-          <div class="support-label">专属服务</div>
-          <div class="support-name">{{ me.support_info.name || '会员顾问' }}</div>
+          <div class="support-label">{{ $t('membership.supportTitle') }}</div>
+          <div class="support-name">{{ me.support_info.name || $t('membership.supportName') }}</div>
           <div v-if="me.support_info.wechat" class="support-contact">💬 {{ me.support_info.wechat }}</div>
           <div v-if="me.support_info.phone" class="support-contact">📞 {{ me.support_info.phone }}</div>
           <div v-if="me.support_info.email" class="support-contact">✉️ {{ me.support_info.email }}</div>
@@ -30,7 +30,7 @@
 
     <!-- Active features -->
     <div v-if="me?.features?.length" class="active-features">
-      <span class="feat-label">已解锁权益：</span>
+      <span class="feat-label">{{ $t('membership.unlockedLabel') }}</span>
       <span v-for="f in me.features" :key="f" class="feat-tag">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M2 5l2 2 4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -41,7 +41,7 @@
 
     <!-- Plans -->
     <div class="plans-section">
-      <h2 class="section-title">选择会员套餐</h2>
+      <h2 class="section-title">{{ $t('membership.sectionTitle') }}</h2>
 
       <!-- Skeleton while loading -->
       <div v-if="!plans.length" class="skeleton-plans">
@@ -77,7 +77,7 @@
             class="plan-card"
             :class="[`plan-${tier}`, { current: isCurrentPlan(plan) }]"
           >
-            <div v-if="isCurrentPlan(plan)" class="current-ribbon">当前等级</div>
+            <div v-if="isCurrentPlan(plan)" class="current-ribbon">{{ $t('membership.current') }}</div>
 
             <div class="plan-name">{{ plan.name }}</div>
             <div class="plan-price">
@@ -89,16 +89,16 @@
             <div class="plan-benefits">
               <div class="benefit">
                 <span class="b-icon">🎁</span>
-                <span>开通赠送 <b>{{ plan.activation_credits }}</b> 积分</span>
+                <span>{{ $t('membership.activationCredits', { n: plan.activation_credits }) }}</span>
               </div>
               <div class="benefit">
                 <span class="b-icon">📅</span>
-                <span>每月自动 <b>{{ plan.monthly_credits }}</b> 积分</span>
+                <span>{{ $t('membership.monthlyCredits', { n: plan.monthly_credits }) }}</span>
               </div>
             </div>
 
             <button class="buy-btn" :class="`btn-${tier}`" :disabled="buying" @click="selectPlan(plan)">
-              立即升级
+              {{ $t('membership.upgradeBtn') }}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M4 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -114,12 +114,12 @@
         <div v-if="showPayModal" class="modal-overlay" @click.self="showPayModal = false">
           <div class="modal-card">
             <button class="modal-close" @click="showPayModal = false">&times;</button>
-            <h3>选择支付方式</h3>
+            <h3>{{ $t('membership.modal.title') }}</h3>
 
             <div class="summary">
-              <div class="sum-row"><span>套餐</span><b>{{ selectedPlan?.name }}</b></div>
-              <div class="sum-row"><span>时长</span>{{ selectedPlan?.duration_days }} 天</div>
-              <div class="sum-row amount-row"><span>金额</span>
+              <div class="sum-row"><span>{{ $t('membership.modal.plan') }}</span><b>{{ selectedPlan?.name }}</b></div>
+              <div class="sum-row"><span>{{ $t('membership.modal.duration') }}</span>{{ selectedPlan?.duration_days }} 天</div>
+              <div class="sum-row amount-row"><span>{{ $t('membership.modal.amount') }}</span>
                 <b class="amt">¥ {{ (selectedPlan?.price_cents / 100).toFixed(2) }}</b>
               </div>
             </div>
@@ -138,14 +138,14 @@
               </button>
               <div v-if="!enabledChannels.length" class="channel-empty">
                 <div class="empty-icon">🏦</div>
-                <div class="empty-title">当前无可用支付渠道</div>
-                <div class="empty-desc">请联系管理员开启支付渠道或稍后再试</div>
+                <div class="empty-title">{{ $t('membership.modal.emptyTitle') }}</div>
+                <div class="empty-desc">{{ $t('membership.modal.emptyDesc') }}</div>
               </div>
             </div>
 
             <button v-if="enabledChannels.length"
               class="confirm-btn" :disabled="!selectedChannel || buying" @click="confirmPurchase">
-              {{ buying ? '处理中…' : '确认支付' }}
+              {{ buying ? $t('membership.modal.processing') : $t('membership.modal.confirm') }}
             </button>
           </div>
         </div>
@@ -157,12 +157,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { membershipAPI, paymentAPI } from '../api'
 import { useUserStore } from '../store'
 
 const router = useRouter()
 const store = useUserStore()
+const { t } = useI18n()
 
 const me = ref(null)
 const plans = ref([])
@@ -176,20 +178,22 @@ const selectedChannel = ref('')
 const buying = ref(false)
 
 const TIER_ICONS = { regular: '👤', vip: '⭐', vvip: '💎', vvvip: '👑' }
-const TIER_LABELS_DEFAULT = { regular: '普通用户', vip: 'VIP', vvip: 'VVIP', vvvip: 'VVVIP' }
-const CHANNEL_META = {
-  stripe: { icon: '💳', label: '信用卡 (Stripe)' },
-  alipay: { icon: '🅰️', label: '支付宝' },
-  wechat: { icon: '💬', label: '微信支付' },
-  manual: { icon: '🧾', label: '模拟支付 / 管理员确认' },
-}
 
-function tierIcon(t) { return TIER_ICONS[t] || '👤' }
-function tierLabel(t) { return publicConfig.value.tier_labels?.[t] || TIER_LABELS_DEFAULT[t] || t }
-function tierFeatures(t) { return publicConfig.value.tier_features?.[t] || [] }
-function channelIcon(ch) { return CHANNEL_META[ch]?.icon || '💰' }
-function channelLabel(ch) { return CHANNEL_META[ch]?.label || ch }
-function plansByTier(t) { return plans.value.filter(p => p.tier === t && p.is_active) }
+const CHANNEL_META = computed(() => ({
+  stripe: { icon: '💳', label: t('membership.channels.stripe') },
+  alipay: { icon: '🅰️', label: t('membership.channels.alipay') },
+  wechat: { icon: '💬', label: t('membership.channels.wechat') },
+  manual: { icon: '🧾', label: t('membership.channels.manual') },
+}))
+
+function tierIcon(tier) { return TIER_ICONS[tier] || '👤' }
+function tierLabel(tier) {
+  return publicConfig.value.tier_labels?.[tier] || t(`common.tier.${tier}`) || tier
+}
+function tierFeatures(tier) { return publicConfig.value.tier_features?.[tier] || [] }
+function channelIcon(ch) { return CHANNEL_META.value[ch]?.icon || '💰' }
+function channelLabel(ch) { return CHANNEL_META.value[ch]?.label || ch }
+function plansByTier(tier) { return plans.value.filter(p => p.tier === tier && p.is_active) }
 function isCurrentPlan(plan) { return me.value?.tier === plan.tier }
 function formatDate(s) {
   if (!s) return ''
@@ -214,7 +218,7 @@ async function confirmPurchase() {
     if (res.payment_url) window.location.href = res.payment_url
     else router.push(`/payment/${res.order.order_no}`)
   } catch (e) {
-    ElMessage.error(e.message || '下单失败')
+    ElMessage.error(e.message || t('common.status.failed'))
   } finally {
     buying.value = false
   }
@@ -234,7 +238,7 @@ async function loadAll() {
     enabledChannels.value = chRes.enabled || []
     channelDescriptions.value = chRes.descriptions || {}
   } catch (e) {
-    ElMessage.error('加载失败: ' + e.message)
+    ElMessage.error(t('common.loading') + ': ' + e.message)
   }
 }
 

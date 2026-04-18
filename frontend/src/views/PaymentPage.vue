@@ -14,82 +14,82 @@
 
     <div v-else-if="order" class="pay-card">
       <div class="pay-header">
-        <h2>订单支付</h2>
+        <h2>{{ $t('payment.title') }}</h2>
         <span class="status-chip" :class="`s-${order.status}`">
           <span class="dot"></span>{{ statusLabel(order.status) }}
         </span>
       </div>
 
       <div class="order-info">
-        <div class="row"><span>订单号</span><code>{{ order.order_no }}</code></div>
-        <div class="row"><span>套餐</span><b>{{ order.plan?.name }}</b></div>
-        <div class="row"><span>时长</span>{{ order.plan?.duration_days }} 天</div>
-        <div class="row"><span>支付方式</span>{{ channelLabel(order.channel) }}</div>
+        <div class="row"><span>{{ $t('payment.orderNo') }}</span><code>{{ order.order_no }}</code></div>
+        <div class="row"><span>{{ $t('payment.planLabel') }}</span><b>{{ order.plan?.name }}</b></div>
+        <div class="row"><span>{{ $t('payment.duration') }}</span>{{ $t('common.unit.days', { n: order.plan?.duration_days }) }}</div>
+        <div class="row"><span>{{ $t('payment.method') }}</span>{{ channelLabel(order.channel) }}</div>
         <div class="row amount-row">
-          <span>应付金额</span>
+          <span>{{ $t('payment.amount') }}</span>
           <b class="amount">¥ {{ (order.amount_cents / 100).toFixed(2) }}</b>
         </div>
-        <div class="row hint-row"><span>订单有效期至</span>{{ formatDate(order.expires_at) }}</div>
+        <div class="row hint-row"><span>{{ $t('payment.expiresAt') }}</span>{{ formatDate(order.expires_at) }}</div>
       </div>
 
       <!-- Manual channel -->
       <div v-if="order.channel === 'manual' && ['pending', 'awaiting_confirm'].includes(order.status)" class="manual-panel">
         <div v-if="order.status === 'pending'" class="manual-hint">
-          <p>{{ message || '请通过您熟悉的方式完成付款，然后点击下方按钮通知我们。' }}</p>
+          <p>{{ message || $t('payment.manual.hint') }}</p>
           <div class="steps">
-            <div class="step"><span class="n">1</span>向管理员指定的收款账户转账 <b>¥ {{ (order.amount_cents / 100).toFixed(2) }}</b></div>
-            <div class="step"><span class="n">2</span>转账附言中填写订单号 <code>{{ order.order_no }}</code></div>
-            <div class="step"><span class="n">3</span>点击下方「我已完成支付」按钮</div>
-            <div class="step"><span class="n">4</span>管理员会在 24 小时内确认并激活您的会员</div>
+            <div class="step"><span class="n">1</span><span v-html="$t('payment.manual.steps.1', { amount: (order.amount_cents / 100).toFixed(2) })"></span></div>
+            <div class="step"><span class="n">2</span><span v-html="$t('payment.manual.steps.2', { orderNo: order.order_no })"></span></div>
+            <div class="step"><span class="n">3</span>{{ $t('payment.manual.steps.3') }}</div>
+            <div class="step"><span class="n">4</span>{{ $t('payment.manual.steps.4') }}</div>
           </div>
           <button class="primary-btn" :disabled="acting" @click="markPaying">
-            {{ acting ? '提交中…' : '我已完成支付' }}
+            {{ acting ? $t('payment.manual.submitting') : $t('payment.manual.paidBtn') }}
           </button>
         </div>
         <div v-else class="waiting-state">
           <div class="state-icon">⏳</div>
-          <h3>等待管理员确认</h3>
-          <p>您的支付信息已提交，管理员会在 24 小时内完成确认并激活会员。</p>
-          <p class="sub-hint">可在「我的订单」随时查看状态</p>
+          <h3>{{ $t('payment.waiting.title') }}</h3>
+          <p>{{ $t('payment.waiting.desc') }}</p>
+          <p class="sub-hint">{{ $t('payment.waiting.hint') }}</p>
         </div>
       </div>
 
       <!-- Stripe -->
       <div v-else-if="order.channel === 'stripe' && order.status === 'pending'" class="channel-panel">
-        <p class="channel-hint">即将跳转 Stripe 完成信用卡支付…</p>
-        <a v-if="paymentUrl" :href="paymentUrl" class="primary-btn">打开 Stripe 支付页</a>
+        <p class="channel-hint">{{ $t('payment.stripe.hint') }}</p>
+        <a v-if="paymentUrl" :href="paymentUrl" class="primary-btn">{{ $t('payment.stripe.btn') }}</a>
       </div>
 
       <!-- Alipay / Wechat -->
       <div v-else-if="['alipay', 'wechat'].includes(order.channel) && order.status === 'pending'" class="channel-panel">
-        <p class="channel-hint">{{ message || '请使用对应 APP 扫码完成支付' }}</p>
+        <p class="channel-hint">{{ message || $t('payment.qr.hint') }}</p>
         <div v-if="qrCodeUrl" class="qr-box">
           <img :src="qrCodeUrl" alt="Payment QR" />
         </div>
         <div v-else class="qr-placeholder">
           <span class="q-icon">📱</span>
-          <p>二维码生成中…</p>
-          <p class="sub-hint">（当前为占位符，真实渠道接入后将显示）</p>
+          <p>{{ $t('payment.qr.loading') }}</p>
+          <p class="sub-hint">{{ $t('payment.qr.note') }}</p>
         </div>
       </div>
 
       <!-- Paid -->
       <div v-else-if="order.status === 'paid'" class="success-state">
         <div class="state-icon success-icon">✓</div>
-        <h3>支付成功</h3>
-        <p>会员已激活！{{ paidAtText }}</p>
-        <button class="primary-btn" @click="$router.push('/membership')">返回会员中心</button>
+        <h3>{{ $t('payment.success.title') }}</h3>
+        <p>{{ $t('payment.success.desc', { paidAt: paidAtText }) }}</p>
+        <button class="primary-btn" @click="$router.push('/membership')">{{ $t('payment.success.btn') }}</button>
       </div>
 
       <div v-else-if="['canceled', 'refunded', 'failed'].includes(order.status)" class="fail-state">
         <div class="state-icon">⚠️</div>
-        <h3>订单{{ statusLabel(order.status) }}</h3>
-        <button class="primary-btn" @click="$router.push('/membership')">重新选择套餐</button>
+        <h3>{{ $t('payment.failState.title', { status: statusLabel(order.status) }) }}</h3>
+        <button class="primary-btn" @click="$router.push('/membership')">{{ $t('payment.failState.btn') }}</button>
       </div>
 
       <div class="footer-actions">
-        <button class="link-btn" @click="$router.push('/orders')">我的订单</button>
-        <button v-if="['pending'].includes(order.status)" class="link-btn danger" @click="cancelOrder">取消订单</button>
+        <button class="link-btn" @click="$router.push('/orders')">{{ $t('payment.myOrdersLink') }}</button>
+        <button v-if="['pending'].includes(order.status)" class="link-btn danger" @click="cancelOrder">{{ $t('payment.cancelLink') }}</button>
       </div>
     </div>
   </div>
@@ -98,11 +98,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { paymentAPI } from '../api'
 
 const route = useRoute()
 const router = useRouter()
+const { t, locale } = useI18n()
 
 const order = ref(null)
 const loading = ref(true)
@@ -111,22 +113,22 @@ const message = ref('')
 const paymentUrl = ref('')
 const qrCodeUrl = ref('')
 
-const CHANNEL_LABELS = { stripe: '信用卡 (Stripe)', alipay: '支付宝', wechat: '微信支付', manual: '模拟支付' }
-const STATUS_MAP = {
-  pending:          '待支付',
-  awaiting_confirm: '等待确认',
-  paid:             '已支付',
-  canceled:         '已取消',
-  refunded:         '已退款',
-  failed:           '失败',
+function channelLabel(ch) {
+  const key = `orders.channels.${ch}`
+  const v = t(key)
+  return v === key ? ch : v
+}
+function statusLabel(s) {
+  const key = `orders.status.${s}`
+  const v = t(key)
+  return v === key ? s : v
+}
+function formatDate(s) {
+  return s ? new Date(s).toLocaleString(locale.value) : ''
 }
 
-function channelLabel(ch) { return CHANNEL_LABELS[ch] || ch }
-function statusLabel(s) { return STATUS_MAP[s] || s }
-function formatDate(s) { return s ? new Date(s).toLocaleString('zh-CN') : '' }
-
 const paidAtText = computed(() =>
-  order.value?.paid_at ? `支付时间 ${formatDate(order.value.paid_at)}` : ''
+  order.value?.paid_at ? t('payment.success.paidAt', { t: formatDate(order.value.paid_at) }) : ''
 )
 
 async function load() {
@@ -134,7 +136,7 @@ async function load() {
   try {
     order.value = await paymentAPI.getOrder(route.params.order_no)
   } catch (e) {
-    ElMessage.error(e.message || '订单不存在')
+    ElMessage.error(e.message || t('common.loading'))
     router.push('/membership')
   } finally { loading.value = false }
 }
@@ -143,18 +145,18 @@ async function markPaying() {
   acting.value = true
   try {
     order.value = await paymentAPI.markPaying(route.params.order_no)
-    ElMessage.success('已提交，等待管理员确认')
-  } catch (e) { ElMessage.error(e.message || '提交失败') }
+    ElMessage.success(t('payment.manual.paidOk'))
+  } catch (e) { ElMessage.error(e.message || t('common.submitting')) }
   finally { acting.value = false }
 }
 
 async function cancelOrder() {
   try {
-    await ElMessageBox.confirm('确定要取消此订单吗？', '取消订单', { type: 'warning' })
+    await ElMessageBox.confirm(t('payment.cancelConfirm'), t('payment.cancelConfirmTitle'), { type: 'warning' })
     order.value = await paymentAPI.cancelOrder(route.params.order_no)
-    ElMessage.success('订单已取消')
+    ElMessage.success(t('payment.cancelOk'))
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.message || '取消失败')
+    if (e !== 'cancel') ElMessage.error(e.message || t('common.submitting'))
   }
 }
 

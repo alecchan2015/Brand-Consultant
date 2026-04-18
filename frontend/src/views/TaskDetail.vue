@@ -32,10 +32,10 @@
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>工作台</span>
+        <span>{{ $t('common.backToDashboard') }}</span>
       </button>
       <div class="title-row">
-        <h1>{{ task?.brand_name || '品牌策划' }}</h1>
+        <h1>{{ task?.brand_name || $t('taskDetail.defaultBrandName') }}</h1>
         <span v-if="task" class="status-pill" :class="`status-${task.status}`">
           <span class="dot"></span>{{ statusLabel[task.status] }}
         </span>
@@ -47,7 +47,7 @@
             <path d="M13 3v4h-4M3 13v-4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M4.2 6a5 5 0 018-1.5L13 7M11.8 10a5 5 0 01-8 1.5L3 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <span>{{ regenerating ? '重新生成中…' : '重新生成' }}</span>
+          <span>{{ regenerating ? $t('taskDetail.regenerating') : $t('taskDetail.regenerate') }}</span>
         </button>
       </div>
     </div>
@@ -55,7 +55,7 @@
     <!-- Query card -->
     <div class="query-card">
       <div class="query-head">
-        <span class="query-label">需求描述</span>
+        <span class="query-label">{{ $t('taskDetail.queryLabel') }}</span>
         <span v-if="task?.created_at" class="query-time">
           {{ new Date(task.created_at).toLocaleString('zh-CN') }}
         </span>
@@ -78,22 +78,22 @@
           <span class="result-name">{{ agentNames[agentType] }}</span>
 
           <span v-if="agentStatus[agentType] === 'streaming'" class="stage-badge streaming">
-            <span class="live-dot"></span>生成中
+            <span class="live-dot"></span>{{ $t('taskDetail.generatingLabel') }}
           </span>
           <span v-else-if="agentStatus[agentType] === 'done'" class="stage-badge done">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M2 5l2 2 4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            完成
+            {{ $t('taskDetail.doneLabel') }}
           </span>
-          <span v-else class="stage-badge waiting">等待中</span>
+          <span v-else class="stage-badge waiting">{{ $t('taskDetail.waitingLabel') }}</span>
         </div>
 
         <!-- Content -->
         <div v-if="agentContents[agentType]" class="md-output" v-html="renderMd(agentContents[agentType])"></div>
         <div v-else-if="agentStatus[agentType] === 'waiting'" class="placeholder">
           <div class="placeholder-icon">⏳</div>
-          <div>等待前序专家完成分析…</div>
+          <div>{{ $t('taskDetail.waitingPlaceholder') }}</div>
         </div>
 
         <!-- Files -->
@@ -103,20 +103,20 @@
               <path d="M4 2h6l4 4v8H4V2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
               <path d="M10 2v4h4" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
             </svg>
-            <span>可下载文件</span>
+            <span>{{ $t('taskDetail.filesTitle') }}</span>
           </div>
           <div class="file-list">
             <div v-for="file in agentFiles[agentType]" :key="file.id" class="file-row">
               <span class="file-icon">{{ fileIcon[file.type] || '📁' }}</span>
               <span class="file-name">{{ file.name }}</span>
-              <span v-if="file.credits === 0" class="cost-pill cost-free">免费</span>
-              <span v-else class="cost-pill cost-paid">{{ file.credits }} 积分</span>
+              <span v-if="file.credits === 0" class="cost-pill cost-free">{{ $t('common.free') }}</span>
+              <span v-else class="cost-pill cost-paid">{{ $t('common.creditsUnit', { n: file.credits }) }}</span>
               <button class="download-btn" @click="downloadFile(file)">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M8 2v9M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                   <path d="M3 14h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                 </svg>
-                下载
+                {{ $t('common.actions.download') }}
               </button>
             </div>
           </div>
@@ -136,6 +136,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import { tasksAPI, filesAPI } from '../api'
 import { useUserStore } from '../store'
@@ -143,6 +144,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const store = useUserStore()
 
 const task = ref(null)
@@ -153,9 +155,20 @@ const agentFiles = ref({})
 const regenerating = ref(false)
 let es = null
 
-const agentNames = { strategy: '战略规划专家', brand: '品牌设计专家', logo_design: 'Logo 设计专家', poster_design: '海报设计专家', operations: '运营实施专家' }
+const agentNames = computed(() => ({
+  strategy: t('common.agent.strategyFull'),
+  brand: t('common.agent.brandFull'),
+  logo_design: t('common.agent.logoDesignFull'),
+  poster_design: t('common.agent.posterDesignFull'),
+  operations: t('common.agent.operationsFull'),
+}))
 const agentIcon  = { strategy: '🎯', brand: '🎨', logo_design: '✨', poster_design: '🖼️', operations: '🚀' }
-const statusLabel = { pending: '待处理', processing: '进行中', completed: '已完成', failed: '失败' }
+const statusLabel = computed(() => ({
+  pending: t('common.status.pending'),
+  processing: t('common.status.processing'),
+  completed: t('common.status.completed'),
+  failed: t('common.status.failed'),
+}))
 const fileIcon = { md: '📄', pdf: '📕', png: '🖼️', pptx: '📊', psd: '🎨' }
 
 const orderedAgents = computed(() => {
@@ -209,7 +222,7 @@ function startStream() {
     } else if (data.type === 'all_done') {
       task.value.status = 'completed'
       es.close()
-      ElMessage.success('内容已生成并保存')
+      ElMessage.success(t('taskDetail.allDone'))
     } else if (data.type === 'error') {
       error.value = data.message
       task.value.status = 'failed'
@@ -232,8 +245,8 @@ async function reloadResults() {
 
 async function handleRegenerate() {
   try {
-    await ElMessageBox.confirm('将清除当前所有生成内容并重新生成，确认继续？', '重新生成',
-      { confirmButtonText: '确认重新生成', cancelButtonText: '取消', type: 'warning' })
+    await ElMessageBox.confirm(t('taskDetail.confirmRegenerate'), t('taskDetail.confirmTitle'),
+      { confirmButtonText: t('taskDetail.confirmBtn'), cancelButtonText: t('common.cancel'), type: 'warning' })
   } catch { return }
   regenerating.value = true
   error.value = ''
@@ -242,7 +255,7 @@ async function handleRegenerate() {
     task.value.status = 'pending'
     initAgentStatuses()
     startStream()
-    ElMessage.info('开始重新生成…')
+    ElMessage.info(t('taskDetail.startedRegen'))
   } catch (e) { ElMessage.error(e.message) }
   finally { regenerating.value = false }
 }
@@ -255,7 +268,7 @@ function downloadFile(file) {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  ElMessage.success('已开始下载，请查看浏览器下载进度')
+  ElMessage.success(t('taskDetail.downloadStarted'))
   setTimeout(() => { store.fetchMe().catch(() => {}) }, 1500)
 }
 

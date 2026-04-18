@@ -39,7 +39,7 @@
                 fill="currentColor" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round"/>
             </svg>
             <span>{{ store.user?.credits ?? 0 }}</span>
-            <span class="credit-unit">积分</span>
+            <span class="credit-unit">{{ $t('common.credits') }}</span>
           </div>
 
           <!-- User info + logout -->
@@ -52,7 +52,7 @@
                   <span v-if="tierLabel" class="tier-pill" :class="`tier-${store.user?.tier}`">
                     {{ tierLabel }}
                   </span>
-                  <span v-else>普通用户</span>
+                  <span v-else>{{ $t('common.tier.regular') }}</span>
                 </div>
               </div>
             </div>
@@ -74,8 +74,9 @@
           <div class="page-title">{{ pageTitle }}</div>
         </div>
         <div class="topbar-right">
+          <LangSwitch />
           <el-tag v-if="store.isAdmin" type="danger" effect="dark" size="small" @click="$router.push('/admin')" style="cursor:pointer">
-            管理后台 →
+            {{ $t('nav.adminConsole') }} →
           </el-tag>
         </div>
       </header>
@@ -94,8 +95,10 @@
 <script setup>
 import { ref, computed, markRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../store'
 import { ElMessageBox } from 'element-plus'
+import LangSwitch from '../components/LangSwitch.vue'
 import {
   Grid, Plus, PictureFilled, Picture, Star, Tickets, SwitchButton,
 } from '@element-plus/icons-vue'
@@ -103,6 +106,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
+const { t } = useI18n()
 
 const mobileOpen = ref(false)
 // Auto-close mobile drawer when navigating
@@ -111,36 +115,33 @@ watch(() => route.path, () => { mobileOpen.value = false })
 const TIER_LABELS = { vip: 'VIP', vvip: 'VVIP', vvvip: 'VVVIP' }
 const tierLabel = computed(() => TIER_LABELS[store.user?.tier] || '')
 
-const navItems = computed(() => {
-  const base = [
-    { path: '/dashboard',  label: '工作台',   icon: markRaw(Grid) },
-    { path: '/tasks/new',  label: '新建任务', icon: markRaw(Plus) },
-    { path: '/logo',       label: 'Logo 生成', icon: markRaw(PictureFilled) },
-    { path: '/poster',     label: '海报生成',  icon: markRaw(Picture) },
-    {
-      path: '/membership',
-      label: '会员升级',
-      icon: markRaw(Star),
-      badge: tierLabel.value,
-      badgeType: store.user?.tier,
-    },
-    { path: '/orders',     label: '我的订单', icon: markRaw(Tickets) },
-  ]
-  return base
-})
+const navItems = computed(() => [
+  { path: '/dashboard',  label: t('nav.dashboard'),  icon: markRaw(Grid) },
+  { path: '/tasks/new',  label: t('nav.newTask'),    icon: markRaw(Plus) },
+  { path: '/logo',       label: t('nav.logo'),       icon: markRaw(PictureFilled) },
+  { path: '/poster',     label: t('nav.poster'),     icon: markRaw(Picture) },
+  {
+    path: '/membership',
+    label: t('nav.membership'),
+    icon: markRaw(Star),
+    badge: tierLabel.value,
+    badgeType: store.user?.tier,
+  },
+  { path: '/orders',     label: t('nav.orders'),     icon: markRaw(Tickets) },
+])
 
-const PAGE_TITLES = {
-  '/dashboard':      '工作台',
-  '/tasks/new':      '新建任务',
-  '/logo':           'Logo 生成',
-  '/poster':         '海报生成',
-  '/membership':     '会员中心',
-  '/orders':         '我的订单',
-}
 const pageTitle = computed(() => {
-  if (route.path.startsWith('/tasks/') && route.path !== '/tasks/new') return '任务详情'
-  if (route.path.startsWith('/payment/')) return '订单支付'
-  return PAGE_TITLES[route.path] || 'Your Brand Consultant'
+  if (route.path.startsWith('/tasks/') && route.path !== '/tasks/new') return t('nav.pageTitles.taskDetail')
+  if (route.path.startsWith('/payment/')) return t('nav.pageTitles.payment')
+  const map = {
+    '/dashboard':  t('nav.pageTitles.dashboard'),
+    '/tasks/new':  t('nav.pageTitles.newTask'),
+    '/logo':       t('nav.pageTitles.logo'),
+    '/poster':     t('nav.pageTitles.poster'),
+    '/membership': t('nav.pageTitles.membership'),
+    '/orders':     t('nav.pageTitles.orders'),
+  }
+  return map[route.path] || t('common.appName')
 })
 
 function toggleSidebar() { mobileOpen.value = !mobileOpen.value }
@@ -156,7 +157,11 @@ function isNavActive(path) {
 }
 
 async function logout() {
-  await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(
+    t('common.actions.logout') + '?',
+    t('common.confirm'),
+    { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+  )
   store.logout()
   router.push('/')
 }
@@ -376,6 +381,7 @@ async function logout() {
   z-index: 10;
 }
 .topbar-left { display: flex; align-items: center; gap: 14px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
 .page-title {
   font-size: 15px; font-weight: 600;
   color: var(--ybc-text-strong);

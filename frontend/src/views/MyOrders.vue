@@ -1,22 +1,22 @@
 <template>
   <div class="orders-page">
     <div class="page-header">
-      <h1>我的订单</h1>
+      <h1>{{ $t('orders.title') }}</h1>
       <button class="refresh-btn" @click="load" :disabled="loading">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
           :style="{ animation: loading ? 'spin 1s linear infinite' : '' }">
           <path d="M13 3v4h-4M3 13v-4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M4.2 6a5 5 0 018-1.5L13 7M11.8 10a5 5 0 01-8 1.5L3 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>刷新</span>
+        <span>{{ $t('common.refresh') }}</span>
       </button>
     </div>
 
     <div v-if="!loading && !orders.length" class="empty-state">
       <div class="empty-icon">📭</div>
-      <h3>还没有订单</h3>
-      <p>立即升级会员，解锁商业级品牌服务</p>
-      <button class="primary-btn" @click="$router.push('/membership')">去会员中心</button>
+      <h3>{{ $t('orders.empty.title') }}</h3>
+      <p>{{ $t('orders.empty.desc') }}</p>
+      <button class="primary-btn" @click="$router.push('/membership')">{{ $t('orders.empty.cta') }}</button>
     </div>
 
     <div v-else class="order-list" :class="{ loading }">
@@ -40,7 +40,7 @@
             <span class="tier-chip" :class="`tier-${o.plan?.tier}`">
               {{ o.plan?.tier?.toUpperCase() }}
             </span>
-            · {{ o.plan?.duration_days }}天
+            · {{ $t('common.unit.days', { n: o.plan?.duration_days }) }}
           </span>
           <span class="meta-item">{{ channelLabel(o.channel) }}</span>
           <span class="meta-item time">{{ formatDate(o.created_at) }}</span>
@@ -51,22 +51,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { paymentAPI } from '../api'
+
+const { t, locale } = useI18n()
 
 const orders = ref([])
 const loading = ref(false)
 
-const CHANNELS = { stripe: '信用卡', alipay: '支付宝', wechat: '微信', manual: '模拟支付' }
-const STATUS = {
-  pending: '待支付', awaiting_confirm: '待确认', paid: '已支付',
-  canceled: '已取消', refunded: '已退款', failed: '失败',
-}
-
-function channelLabel(c) { return CHANNELS[c] || c }
+function channelLabel(c) { return t(`orders.channels.${c}`) !== `orders.channels.${c}` ? t(`orders.channels.${c}`) : c }
 function isClickable(s) { return ['pending', 'awaiting_confirm'].includes(s) }
-function statusLabel(s) { return STATUS[s] || s }
-function formatDate(s) { return new Date(s).toLocaleString('zh-CN') }
+function statusLabel(s) { return t(`orders.status.${s}`) !== `orders.status.${s}` ? t(`orders.status.${s}`) : s }
+function formatDate(s) {
+  if (!s) return ''
+  return new Date(s).toLocaleString(locale.value)
+}
 
 async function load() {
   loading.value = true

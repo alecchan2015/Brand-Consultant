@@ -3,20 +3,20 @@
     <div class="callback-card">
       <div v-if="state === 'loading'">
         <div class="spinner"></div>
-        <h2>正在完成 Google 登录…</h2>
-        <p>请稍候</p>
+        <h2>{{ $t('auth.callback.loadingTitle') }}</h2>
+        <p>{{ $t('auth.callback.loadingDesc') }}</p>
       </div>
       <div v-else-if="state === 'pending'" class="pending">
         <div class="check-icon">⏳</div>
-        <h2>注册成功</h2>
-        <p>您的账号正在等待管理员审核，审核通过后即可登录。</p>
-        <button class="btn" @click="$router.push('/')">返回首页</button>
+        <h2>{{ $t('auth.callback.pendingTitle') }}</h2>
+        <p>{{ $t('auth.callback.pendingDesc') }}</p>
+        <button class="btn" @click="$router.push('/')">{{ $t('auth.callback.backHome') }}</button>
       </div>
       <div v-else-if="state === 'error'" class="error">
         <div class="check-icon">❌</div>
-        <h2>登录失败</h2>
+        <h2>{{ $t('auth.callback.errorTitle') }}</h2>
         <p>{{ errorMsg }}</p>
-        <button class="btn" @click="$router.push('/')">返回首页</button>
+        <button class="btn" @click="$router.push('/')">{{ $t('auth.callback.backHome') }}</button>
       </div>
     </div>
   </div>
@@ -25,12 +25,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../store'
 import { authAPI } from '../api'
 
 const router = useRouter()
 const route = useRoute()
 const store = useUserStore()
+const { t } = useI18n()
 
 const state = ref('loading')     // 'loading' | 'pending' | 'error'
 const errorMsg = ref('')
@@ -42,13 +44,13 @@ onMounted(async () => {
 
   if (!code || !stateParam) {
     state.value = 'error'
-    errorMsg.value = '登录链接不完整，请重新发起登录'
+    errorMsg.value = t('auth.callback.missingParams')
     return
   }
 
   if (savedState && stateParam !== savedState) {
     state.value = 'error'
-    errorMsg.value = '登录链接已失效，请重新登录'
+    errorMsg.value = t('auth.callback.stateMismatch')
     return
   }
 
@@ -67,11 +69,11 @@ onMounted(async () => {
       router.push(store.isAdmin ? '/admin' : '/dashboard')
     } else {
       state.value = 'error'
-      errorMsg.value = '未收到有效的登录凭证'
+      errorMsg.value = t('auth.callback.noToken')
     }
   } catch (e) {
     state.value = 'error'
-    errorMsg.value = e.message || 'Google 认证失败'
+    errorMsg.value = e.message || t('auth.callback.fallback')
   }
 })
 </script>

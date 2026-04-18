@@ -5,15 +5,15 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>工作台</span>
+      <span>{{ $t('common.backToDashboard') }}</span>
     </button>
     <div class="page-hero">
       <div class="hero-badge">
         <span class="dot"></span>
-        <span>AI Logo Studio</span>
+        <span>{{ $t('logo.badge') }}</span>
       </div>
-      <h1>Logo 智能生成</h1>
-      <p>AI 驱动的品牌 Logo 设计 · 输出 PNG / PSD / 品牌套件 ZIP</p>
+      <h1>{{ $t('logo.title') }}</h1>
+      <p>{{ $t('logo.subtitle') }}</p>
     </div>
 
     <!-- Form Section -->
@@ -26,10 +26,10 @@
         @submit.prevent="handleGenerate"
       >
         <!-- Brand Name -->
-        <el-form-item label="品牌名称" prop="brandName">
+        <el-form-item :label="$t('logo.form.brand')" prop="brandName">
           <el-input
             v-model="form.brandName"
-            placeholder="请输入品牌名称"
+            :placeholder="$t('logo.form.brandPlaceholder')"
             maxlength="40"
             show-word-limit
             clearable
@@ -37,8 +37,8 @@
         </el-form-item>
 
         <!-- Industry -->
-        <el-form-item label="所属行业" prop="industry">
-          <el-select v-model="form.industry" placeholder="请选择行业" style="width: 100%">
+        <el-form-item :label="$t('logo.form.industry')" prop="industry">
+          <el-select v-model="form.industry" :placeholder="$t('logo.form.industryPlaceholder')" style="width: 100%">
             <el-option
               v-for="item in industries"
               :key="item.value"
@@ -49,7 +49,7 @@
         </el-form-item>
 
         <!-- Style Picker -->
-        <el-form-item label="设计风格" prop="style">
+        <el-form-item :label="$t('logo.form.style')" prop="style">
           <div class="style-grid">
             <div
               v-for="s in styles"
@@ -66,26 +66,26 @@
 
         <!-- Colors -->
         <div class="color-row">
-          <el-form-item label="主色调" class="color-item">
+          <el-form-item :label="$t('logo.form.primaryColor')" class="color-item">
             <el-color-picker v-model="form.primaryColor" show-alpha />
           </el-form-item>
-          <el-form-item label="辅助色（可选）" class="color-item">
+          <el-form-item :label="$t('logo.form.secondaryColor')" class="color-item">
             <el-color-picker v-model="form.secondaryColor" show-alpha />
           </el-form-item>
         </div>
 
         <!-- Include Text Toggle -->
-        <el-form-item label="包含品牌名文字">
+        <el-form-item :label="$t('logo.form.includeText')">
           <el-switch
             v-model="form.includeText"
-            active-text="是"
-            inactive-text="否"
+            :active-text="$t('common.yes')"
+            :inactive-text="$t('common.no')"
           />
-          <span class="form-hint">是否在 Logo 中包含品牌名文字</span>
+          <span class="form-hint">{{ $t('logo.form.includeTextHint') }}</span>
         </el-form-item>
 
         <!-- Variant Count -->
-        <el-form-item label="生成方案数量">
+        <el-form-item :label="$t('logo.form.variantCount')">
           <el-slider
             v-model="form.variantCount"
             :min="1"
@@ -100,8 +100,8 @@
         <!-- Credit Cost -->
         <div class="credit-info">
           <el-icon><Coin /></el-icon>
-          <span>本次生成消耗 <strong>{{ creditCost }}</strong> 积分，当前余额: <strong>{{ userCredits }}</strong></span>
-          <el-tag v-if="userCredits < creditCost" type="danger" size="small">余额不足</el-tag>
+          <span>{{ $t('logo.form.creditInfo', { cost: creditCost, balance: userCredits }) }}</span>
+          <el-tag v-if="userCredits < creditCost" type="danger" size="small">{{ $t('logo.form.insufficient') }}</el-tag>
         </div>
 
         <!-- Generate Button -->
@@ -115,7 +115,7 @@
             @click="handleGenerate"
           >
             <el-icon v-if="!generating"><MagicStick /></el-icon>
-            {{ generating ? '生成中...' : '开始生成 Logo' }}
+            {{ generating ? $t('logo.form.generating') : $t('logo.form.generate') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -125,7 +125,7 @@
     <el-card v-if="generationId && !generationDone && !generationError" class="progress-card" shadow="never">
       <div class="progress-header">
         <el-icon class="spin"><Loading /></el-icon>
-        <span>正在生成 Logo，请耐心等待...</span>
+        <span>{{ $t('logo.progress.title') }}</span>
       </div>
       <el-progress
         :percentage="progress.percent"
@@ -165,13 +165,13 @@
     <!-- Result Section -->
     <el-card v-if="generationDone && variants.length" class="result-card" shadow="never">
       <div class="result-header">
-        <h3>生成结果</h3>
+        <h3>{{ $t('logo.result.title') }}</h3>
         <div class="bg-toggle">
-          <span class="bg-label">背景预览:</span>
+          <span class="bg-label">{{ $t('logo.result.bgLabel') }}</span>
           <el-radio-group v-model="previewBg" size="small">
-            <el-radio-button value="transparent">透明</el-radio-button>
-            <el-radio-button value="white">白色</el-radio-button>
-            <el-radio-button value="black">黑色</el-radio-button>
+            <el-radio-button value="transparent">{{ $t('logo.result.bg.transparent') }}</el-radio-button>
+            <el-radio-button value="white">{{ $t('logo.result.bg.white') }}</el-radio-button>
+            <el-radio-button value="black">{{ $t('logo.result.bg.black') }}</el-radio-button>
           </el-radio-group>
         </div>
       </div>
@@ -189,9 +189,9 @@
             class="variant-preview"
             :class="`bg-${previewBg}`"
           >
-            <img :src="variant.png_url || variant.thumbnail" :alt="`方案 ${idx + 1}`" />
+            <img :src="variant.png_url || variant.thumbnail" :alt="$t('logo.result.variant', { n: idx + 1 })" />
           </div>
-          <div class="variant-label">方案 {{ idx + 1 }}</div>
+          <div class="variant-label">{{ $t('logo.result.variant', { n: idx + 1 }) }}</div>
         </div>
       </div>
 
@@ -202,19 +202,19 @@
             <path d="M8 2v9M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M3 14h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          PNG · 透明背景
+          {{ $t('logo.result.dlPng') }}
         </button>
         <button class="dl-btn" @click="handleDownload('psd')">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M8 2v9M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          PSD · 分层源文件
+          {{ $t('logo.result.dlPsd') }}
         </button>
         <button class="dl-btn" @click="handleDownload('zip')">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M8 2v9M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          品牌包 ZIP · 全格式
+          {{ $t('logo.result.dlZip') }}
         </button>
       </div>
 
@@ -225,7 +225,7 @@
             <path d="M13 3v4h-4M3 13v-4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M4.2 6a5 5 0 018-1.5L13 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          重新生成
+          {{ $t('logo.result.reset') }}
         </button>
       </div>
     </el-card>
@@ -234,14 +234,14 @@
     <el-card v-if="history.length || historyLoading" class="history-card" shadow="never">
       <template #header>
         <div class="history-header">
-          <span class="history-title">📋 生成历史</span>
+          <span class="history-title">📋 {{ $t('logo.history.title') }}</span>
           <el-button size="small" text @click="loadHistory">
-            <el-icon><Refresh /></el-icon> 刷新
+            <el-icon><Refresh /></el-icon> {{ $t('common.refresh') }}
           </el-button>
         </div>
       </template>
       <div v-if="historyLoading" v-loading="true" style="min-height:60px" />
-      <el-empty v-else-if="!history.length" description="暂无生成记录" :image-size="60" />
+      <el-empty v-else-if="!history.length" :description="$t('logo.history.empty')" :image-size="60" />
       <div v-else class="history-list">
         <div
           v-for="item in history"
@@ -263,7 +263,7 @@
             <div class="history-brand">{{ item.brand_name }}</div>
             <div class="history-meta">
               <el-tag :type="item.status === 'done' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small">
-                {{ item.status === 'done' ? '完成' : item.status === 'failed' ? '失败' : '生成中' }}
+                {{ item.status === 'done' ? $t('logo.history.statusDone') : item.status === 'failed' ? $t('logo.history.statusFailed') : $t('logo.history.statusProcessing') }}
               </el-tag>
               <span class="history-style">{{ styleLabel(item.style) }}</span>
               <span class="history-time">{{ formatTime(item.created_at) }}</span>
@@ -277,7 +277,7 @@
         </div>
       </div>
       <div v-if="historyTotal > history.length" class="history-more">
-        <el-button text @click="loadMoreHistory">加载更多</el-button>
+        <el-button text @click="loadMoreHistory">{{ $t('logo.history.more') }}</el-button>
       </div>
     </el-card>
   </div>
@@ -285,6 +285,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../store'
 import { ElMessage } from 'element-plus'
 import {
@@ -296,6 +297,9 @@ import {
   Refresh,
 } from '@element-plus/icons-vue'
 import api, { logoAPI } from '../api'
+
+// ── i18n ─────────────────────────────────────────────
+const { t } = useI18n()
 
 // ── Store ────────────────────────────────────────────
 const store = useUserStore()
@@ -314,38 +318,38 @@ const form = reactive({
   variantCount: 3,
 })
 
-const rules = {
+const rules = computed(() => ({
   brandName: [
-    { required: true, message: '请输入品牌名称', trigger: 'blur' },
-    { max: 40, message: '品牌名称不超过40个字符', trigger: 'blur' },
+    { required: true, message: t('logo.form.brandPlaceholder'), trigger: 'blur' },
+    { max: 40, message: t('logo.form.brand') + ' ≤ 40', trigger: 'blur' },
   ],
   industry: [
-    { required: true, message: '请选择行业', trigger: 'change' },
+    { required: true, message: t('logo.form.industryPlaceholder'), trigger: 'change' },
   ],
   style: [
-    { required: true, message: '请选择设计风格', trigger: 'change' },
+    { required: true, message: t('logo.form.style'), trigger: 'change' },
   ],
-}
+}))
 
-const industries = [
-  { label: '美妆护肤', value: '美妆护肤' },
-  { label: '家居家具', value: '家居家具' },
-  { label: '科技智能', value: '科技智能' },
-  { label: '食品饮料', value: '食品饮料' },
-  { label: '服装时尚', value: '服装时尚' },
-  { label: '教育培训', value: '教育培训' },
-  { label: '医疗健康', value: '医疗健康' },
-  { label: '其他', value: '其他' },
-]
+const industries = computed(() => [
+  { label: t('logo.industries.beauty'),    value: '美妆护肤' },
+  { label: t('logo.industries.furniture'), value: '家居家具' },
+  { label: t('logo.industries.tech'),      value: '科技智能' },
+  { label: t('logo.industries.food'),      value: '食品饮料' },
+  { label: t('logo.industries.fashion'),   value: '服装时尚' },
+  { label: t('logo.industries.education'), value: '教育培训' },
+  { label: t('logo.industries.health'),    value: '医疗健康' },
+  { label: t('logo.industries.other'),     value: '其他' },
+])
 
-const styles = [
-  { label: '现代简约', value: 'modern', icon: '\uD83D\uDD32' },
-  { label: '极简主义', value: 'minimal', icon: '\u2B1C' },
-  { label: '奢华高端', value: 'luxury', icon: '\uD83D\uDC8E' },
-  { label: '科技未来', value: 'tech', icon: '\uD83D\uDD2E' },
-  { label: '自然生态', value: 'natural', icon: '\uD83C\uDF3F' },
-  { label: '活泼趣味', value: 'playful', icon: '\uD83C\uDF88' },
-]
+const styles = computed(() => [
+  { label: t('logo.styles.modern'),  value: 'modern',  icon: '\uD83D\uDD32' },
+  { label: t('logo.styles.minimal'), value: 'minimal', icon: '\u2B1C' },
+  { label: t('logo.styles.luxury'),  value: 'luxury',  icon: '\uD83D\uDC8E' },
+  { label: t('logo.styles.tech'),    value: 'tech',    icon: '\uD83D\uDD2E' },
+  { label: t('logo.styles.natural'), value: 'natural', icon: '\uD83C\uDF3F' },
+  { label: t('logo.styles.playful'), value: 'playful', icon: '\uD83C\uDF88' },
+])
 
 const variantMarks = { 1: '1', 2: '2', 3: '3', 4: '4' }
 
@@ -364,14 +368,14 @@ const downloading = ref('')
 const progress = reactive({ percent: 0, label: '' })
 let eventSource = null
 
-const progressSteps = [
-  { label: '优化提示词', at: 10 },
-  { label: '生成 Logo', at: 50 },
-  { label: '去除背景', at: 70 },
-  { label: '构建 PSD', at: 85 },
-  { label: '打包品牌包', at: 95 },
-  { label: '完成', at: 100 },
-]
+const progressSteps = computed(() => [
+  { label: t('logo.progress.steps.optimizePrompt'), at: 10 },
+  { label: t('logo.progress.steps.generate'),       at: 50 },
+  { label: t('logo.progress.steps.removeBg'),        at: 70 },
+  { label: t('logo.progress.steps.buildPsd'),        at: 85 },
+  { label: t('logo.progress.steps.pack'),            at: 95 },
+  { label: t('logo.progress.steps.done'),            at: 100 },
+])
 
 // ── Actions ──────────────────────────────────────────
 async function handleGenerate() {
@@ -380,7 +384,7 @@ async function handleGenerate() {
   if (!valid) return
 
   if (userCredits.value < creditCost.value) {
-    ElMessage.warning('积分余额不足，请充值后再试')
+    ElMessage.warning(t('logo.errInsufficient'))
     return
   }
 
@@ -404,7 +408,7 @@ async function handleGenerate() {
     generationId.value = res.generation_id
     startProgressPolling(res.generation_id)
   } catch (e) {
-    generationError.value = e.message || '生成请求失败'
+    generationError.value = e.message || t('logo.errConnection')
     ElMessage.error(generationError.value)
   } finally {
     generating.value = false
@@ -431,9 +435,9 @@ function startProgressPolling(id) {
         closeEventSource()
         store.fetchMe()
         loadHistory()
-        ElMessage.success('Logo 生成完成')
+        ElMessage.success(t('logo.successGen'))
       } else if (data.type === 'error') {
-        generationError.value = data.message || '生成过程出错'
+        generationError.value = data.message || t('logo.errConnection')
         closeEventSource()
         ElMessage.error(generationError.value)
       }
@@ -445,7 +449,7 @@ function startProgressPolling(id) {
   eventSource.onerror = () => {
     closeEventSource()
     if (!generationDone.value && !generationError.value) {
-      generationError.value = '连接中断，请刷新页面重试'
+      generationError.value = t('logo.errConnection')
     }
   }
 }
@@ -470,7 +474,7 @@ function handleDownload(format) {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  ElMessage.success('已开始下载')
+  ElMessage.success(t('logo.downloadStarted'))
 }
 
 function handleReset() {
@@ -533,8 +537,15 @@ function downloadHistory(item, format) {
 }
 
 function styleLabel(val) {
-  const map = { modern: '现代简约', minimal: '极简主义', luxury: '奢华高端', tech: '科技未来', natural: '自然生态', playful: '活泼趣味' }
-  return map[val] || val || ''
+  const stylesMap = {
+    modern:  t('logo.styles.modern'),
+    minimal: t('logo.styles.minimal'),
+    luxury:  t('logo.styles.luxury'),
+    tech:    t('logo.styles.tech'),
+    natural: t('logo.styles.natural'),
+    playful: t('logo.styles.playful'),
+  }
+  return stylesMap[val] || val || ''
 }
 
 function formatTime(iso) {

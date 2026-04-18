@@ -2,8 +2,8 @@
   <div class="auth-tabs">
     <!-- Mode switcher: 登录 / 注册 -->
     <div class="mode-switch">
-      <button :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button>
-      <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button>
+      <button :class="{ active: mode === 'login' }" @click="mode = 'login'">{{ $t('auth.tabLogin') }}</button>
+      <button :class="{ active: mode === 'register' }" @click="mode = 'register'">{{ $t('auth.tabRegister') }}</button>
     </div>
 
     <!-- Channel tabs -->
@@ -22,85 +22,81 @@
     <!-- ── Username + Password ── -->
     <div v-if="activeChannel === 'username_password'" class="channel-body">
       <div class="field">
-        <label>用户名</label>
-        <input v-model="form.username" autocomplete="username" placeholder="请输入用户名" />
+        <label>{{ $t('auth.field.username') }}</label>
+        <input v-model="form.username" autocomplete="username" :placeholder="$t('auth.placeholder.username')" />
       </div>
       <div v-if="mode === 'register'" class="field">
-        <label>邮箱</label>
-        <input v-model="form.email" type="email" autocomplete="email" placeholder="your@email.com" />
+        <label>{{ $t('auth.field.email') }}</label>
+        <input v-model="form.email" type="email" autocomplete="email" :placeholder="$t('auth.placeholder.email')" />
       </div>
       <div class="field">
-        <label>密码</label>
+        <label>{{ $t('auth.field.password') }}</label>
         <input v-model="form.password" type="password"
                :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
-               placeholder="请输入密码" @keyup.enter="submit" />
+               :placeholder="$t('auth.placeholder.password')" @keyup.enter="submit" />
       </div>
       <button class="submit" :disabled="loading" @click="submit">
-        {{ loading ? '处理中…' : (mode === 'login' ? '登 录' : '注 册') }}
+        {{ loading ? $t('common.processing') : (mode === 'login' ? $t('auth.btnLogin') : $t('auth.btnRegister')) }}
       </button>
     </div>
 
     <!-- ── Email OTP ── -->
     <div v-if="activeChannel === 'email_otp'" class="channel-body">
       <div class="field">
-        <label>邮箱</label>
-        <input v-model="form.email" type="email" autocomplete="email" placeholder="your@email.com" />
+        <label>{{ $t('auth.field.email') }}</label>
+        <input v-model="form.email" type="email" autocomplete="email" :placeholder="$t('auth.placeholder.email')" />
       </div>
       <div class="field otp-field">
-        <label>验证码</label>
+        <label>{{ $t('auth.field.otp') }}</label>
         <div class="otp-row">
-          <input v-model="form.otp" inputmode="numeric" maxlength="6" placeholder="6 位验证码" />
+          <input v-model="form.otp" inputmode="numeric" maxlength="6" :placeholder="$t('auth.placeholder.otp')" />
           <button class="otp-btn" :disabled="otpCooldown > 0 || !form.email || otpSending" @click="sendOtp('email')">
-            {{ otpSending ? '发送中…' : (otpCooldown > 0 ? `${otpCooldown}s` : '发送验证码') }}
+            {{ otpSending ? $t('auth.field.sending') : (otpCooldown > 0 ? $t('auth.field.cooldown', { s: otpCooldown }) : $t('auth.field.sendOtp')) }}
           </button>
         </div>
       </div>
       <div v-if="mode === 'register'" class="field optional-block">
         <label class="toggle-company" @click="showCompany = !showCompany">
-          <span>{{ showCompany ? '▾' : '▸' }}</span> 完善企业信息（选填）
+          <span>{{ showCompany ? '▾' : '▸' }}</span> {{ $t('auth.expandCompany') }}
         </label>
         <div v-if="showCompany" class="company-fields">
-          <input v-model="profile.company_name" placeholder="公司名称" />
-          <input v-model="profile.industry" placeholder="所在行业" />
-          <input v-model="profile.position" placeholder="职位" />
+          <input v-model="profile.company_name" :placeholder="$t('auth.company.name')" />
+          <input v-model="profile.industry" :placeholder="$t('auth.company.industry')" />
+          <input v-model="profile.position" :placeholder="$t('auth.company.position')" />
           <select v-model="profile.company_size">
-            <option value="">公司规模</option>
-            <option value="1-10">1-10 人</option>
-            <option value="11-50">11-50 人</option>
-            <option value="51-200">51-200 人</option>
-            <option value="201-1000">201-1000 人</option>
-            <option value="1000+">1000+ 人</option>
+            <option value="">{{ $t('auth.company.size') }}</option>
+            <option v-for="(label, val) in companySizes" :key="val" :value="val">{{ label }}</option>
           </select>
         </div>
       </div>
       <button class="submit" :disabled="loading" @click="submit">
-        {{ loading ? '处理中…' : (mode === 'login' ? '登 录' : '完成注册') }}
+        {{ loading ? $t('common.processing') : (mode === 'login' ? $t('auth.btnLogin') : $t('auth.btnComplete')) }}
       </button>
     </div>
 
     <!-- ── Phone SMS ── -->
     <div v-if="activeChannel === 'phone_sms'" class="channel-body">
       <div class="field">
-        <label>手机号</label>
-        <input v-model="form.phone" inputmode="numeric" maxlength="11" placeholder="11 位手机号" />
+        <label>{{ $t('auth.field.phone') }}</label>
+        <input v-model="form.phone" inputmode="numeric" maxlength="11" :placeholder="$t('auth.placeholder.phone')" />
       </div>
       <div class="field otp-field">
-        <label>验证码</label>
+        <label>{{ $t('auth.field.otp') }}</label>
         <div class="otp-row">
-          <input v-model="form.otp" inputmode="numeric" maxlength="6" placeholder="6 位验证码" />
+          <input v-model="form.otp" inputmode="numeric" maxlength="6" :placeholder="$t('auth.placeholder.otp')" />
           <button class="otp-btn" :disabled="otpCooldown > 0 || !isValidPhone || otpSending" @click="sendOtp('phone')">
-            {{ otpSending ? '发送中…' : (otpCooldown > 0 ? `${otpCooldown}s` : '发送验证码') }}
+            {{ otpSending ? $t('auth.field.sending') : (otpCooldown > 0 ? $t('auth.field.cooldown', { s: otpCooldown }) : $t('auth.field.sendOtp')) }}
           </button>
         </div>
       </div>
       <button class="submit" :disabled="loading" @click="submit">
-        {{ loading ? '处理中…' : (mode === 'login' ? '登 录' : '完成注册') }}
+        {{ loading ? $t('common.processing') : (mode === 'login' ? $t('auth.btnLogin') : $t('auth.btnComplete')) }}
       </button>
     </div>
 
     <!-- ── Google OAuth ── -->
     <div v-if="activeChannel === 'google_oauth'" class="channel-body google-body">
-      <p class="google-hint">使用您的 Google 账号快速{{ mode === 'login' ? '登录' : '注册' }}</p>
+      <p class="google-hint">{{ $t('auth.googleHint', { mode: mode === 'login' ? $t('auth.tabLogin') : $t('auth.tabRegister') }) }}</p>
       <button class="submit google-btn" :disabled="loading" @click="startGoogleAuth">
         <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right:8px;">
           <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84c-.21 1.12-.84 2.07-1.79 2.71v2.26h2.9c1.7-1.57 2.69-3.88 2.69-6.61z"/>
@@ -108,7 +104,7 @@
           <path fill="#FBBC04" d="M3.95 10.7c-.18-.54-.28-1.12-.28-1.7s.1-1.16.28-1.7V4.96H.96C.35 6.17 0 7.55 0 9s.35 2.83.96 4.04l2.99-2.34z"/>
           <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l2.99 2.34C4.66 5.17 6.65 3.58 9 3.58z"/>
         </svg>
-        继续使用 Google
+        {{ $t('auth.googleBtn') }}
       </button>
     </div>
 
@@ -120,6 +116,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../store'
 import { authAPI } from '../api'
 
@@ -130,6 +127,7 @@ const emit = defineEmits(['success'])
 
 const router = useRouter()
 const store = useUserStore()
+const { t } = useI18n()
 
 const mode = ref(props.initialMode)
 const activeChannel = ref('username_password')
@@ -155,13 +153,22 @@ const pendingMsg = ref('')
 const otpCooldown = ref(0)
 const otpSending = ref(false)
 
+// Company sizes as computed so they react to locale changes
+const companySizes = computed(() => ({
+  '1-10':     t('auth.company.sizes.1-10'),
+  '11-50':    t('auth.company.sizes.11-50'),
+  '51-200':   t('auth.company.sizes.51-200'),
+  '201-1000': t('auth.company.sizes.201-1000'),
+  '1000+':    t('auth.company.sizes.1000+'),
+}))
+
 // Public config — which channels to show
-const allChannels = [
-  { key: 'username_password', label: '账号密码', icon: '🔒' },
-  { key: 'email_otp',         label: '邮箱',     icon: '📧' },
-  { key: 'phone_sms',         label: '手机',     icon: '📱' },
-  { key: 'google_oauth',      label: 'Google',   icon: '🌐' },
-]
+const allChannels = computed(() => [
+  { key: 'username_password', label: t('auth.channel.usernamePassword'), icon: '🔒' },
+  { key: 'email_otp',         label: t('auth.channel.emailOtp'),         icon: '📧' },
+  { key: 'phone_sms',         label: t('auth.channel.phoneSms'),         icon: '📱' },
+  { key: 'google_oauth',      label: t('auth.channel.googleOauth'),      icon: '🌐' },
+])
 const enabledMethods = ref({
   username_password: true,
   email_otp: true,
@@ -169,7 +176,7 @@ const enabledMethods = ref({
   google_oauth: false,
 })
 const availableChannels = computed(() =>
-  allChannels.filter(c => enabledMethods.value[c.key])
+  allChannels.value.filter(c => enabledMethods.value[c.key])
 )
 
 const isValidPhone = computed(() =>
@@ -206,16 +213,16 @@ onUnmounted(() => { if (cooldownTimer) clearInterval(cooldownTimer) })
 async function sendOtp(channel) {
   errorMsg.value = ''
   const target = channel === 'email' ? form.value.email : form.value.phone
-  if (!target) { errorMsg.value = channel === 'email' ? '请填写邮箱' : '请填写手机号'; return }
+  if (!target) { errorMsg.value = channel === 'email' ? t('auth.errEmailRequired') : t('auth.errPhoneRequired'); return }
   if (channel === 'phone' && !isValidPhone.value) {
-    errorMsg.value = '手机号格式不正确'; return
+    errorMsg.value = t('auth.errInvalidPhone'); return
   }
   otpSending.value = true
   try {
     await authAPI.sendOtp({ channel, target, purpose: mode.value === 'login' ? 'login' : 'register' })
     startCooldown(60)
   } catch (e) {
-    errorMsg.value = e.message || '发送失败'
+    errorMsg.value = e.message || t('auth.errGenericSend')
   } finally {
     otpSending.value = false
   }
@@ -269,7 +276,7 @@ async function submit() {
 
     // Handle pending approval flow
     if (res?.pending_approval) {
-      pendingMsg.value = res.message || '账号已创建，等待管理员审核'
+      pendingMsg.value = res.message || t('auth.pendingApproval')
       return
     }
 
@@ -282,7 +289,7 @@ async function submit() {
 
     emit('success', res?.user || store.user)
   } catch (e) {
-    errorMsg.value = e.message || '操作失败'
+    errorMsg.value = e.message || t('auth.errGenericOp')
   } finally {
     loading.value = false
   }
@@ -297,7 +304,7 @@ async function startGoogleAuth() {
       window.location.href = res.url
     }
   } catch (e) {
-    errorMsg.value = e.message || 'Google 登录不可用'
+    errorMsg.value = e.message || t('auth.errGenericOp')
   }
 }
 
